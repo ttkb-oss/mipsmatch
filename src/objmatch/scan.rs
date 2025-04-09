@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-CLAUSE
-use std::io::{self};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_with::{self, serde_as};
 use serde_yaml::{self};
 use std::collections::HashMap;
+use std::io::{self};
 
 use crate::objmatch::Options;
 
@@ -35,10 +35,14 @@ struct SegmentOffset {
     symbols: HashMap<String, usize>,
 }
 
-
-
-fn find(signature: u64, size: usize, instructions: &Vec<u32>, start: usize, end: usize, options: &mut Options) -> Option<usize> {
-
+fn find(
+    signature: u64,
+    size: usize,
+    instructions: &[u32],
+    start: usize,
+    end: usize,
+    options: &mut Options,
+) -> Option<usize> {
     let mut i = start;
     let mut offset = -1;
     let mut count = 0;
@@ -50,7 +54,6 @@ fn find(signature: u64, size: usize, instructions: &Vec<u32>, start: usize, end:
         rm = (options.radix * rm) % options.coefficient;
     }
     // println!("rm {:08x} size: {}, count: {}", rm, size, count);
-
 
     while count < size && i < end {
         hash = ((options.radix * hash) + instructions[i] as u64) % options.coefficient;
@@ -65,10 +68,11 @@ fn find(signature: u64, size: usize, instructions: &Vec<u32>, start: usize, end:
     }
 
     while hash != signature && i < end {
-        hash = (hash + options.coefficient - (rm * instructions[i - count] as u64) % options.coefficient) % options.coefficient;
+        hash = (hash + options.coefficient
+            - (rm * instructions[i - count] as u64) % options.coefficient)
+            % options.coefficient;
         hash = ((options.radix * hash) + instructions[i] as u64) % options.coefficient;
         i += 1;
-
     }
 
     if hash == signature {
@@ -84,25 +88,27 @@ pub fn scan(match_file: &String, bin_file: &String, options: &mut Options) {
 
     let bytes = std::fs::read(bin_file).expect("Could not read bin file");
 
-    let instructions: Vec<u32> = bytes.chunks(4).map(|b| {
-        // TODO: make endianness optional
-        let instruction: u32 = ((b[3] as u32) << 24) |
-            ((b[2] as u32) << 16) |
-            ((b[1]  as u32) << 8) |
-            (b[0] as u32);
+    let instructions: Vec<u32> = bytes
+        .chunks(4)
+        .map(|b| {
+            // TODO: make endianness optional
+            let instruction: u32 = ((b[3] as u32) << 24)
+                | ((b[2] as u32) << 16)
+                | ((b[1] as u32) << 8)
+                | (b[0] as u32);
 
-        // mask any fields which may refer to global symbols. this will
-        // mask false positives, but keep most immediates and local vars.
-        match instruction >> 26 {
-            // r-type
-            0 => instruction,
-            // j-type
-            2 | 3 => instruction & 0xFC000000,
-            // i-type
-            _ => instruction & 0xFFFF0000
-        }
-    }).collect();
-
+            // mask any fields which may refer to global symbols. this will
+            // mask false positives, but keep most immediates and local vars.
+            match instruction >> 26 {
+                // r-type
+                0 => instruction,
+                // j-type
+                2 | 3 => instruction & 0xFC000000,
+                // i-type
+                _ => instruction & 0xFFFF0000,
+            }
+        })
+        .collect();
 
     let f = std::fs::File::open(match_file).unwrap();
     for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
@@ -111,9 +117,14 @@ pub fn scan(match_file: &String, bin_file: &String, options: &mut Options) {
         // eprintln!("segment: {}", segment.name);
 
         // try to find the entire object, first
-        let offset = find(segment.signature,
-                          segment.size / 4,
-                          &instructions, 0, instructions.len(), options);
+        let offset = find(
+            segment.signature,
+            segment.size / 4,
+            &instructions,
+            0,
+            instructions.len(),
+            options,
+        );
 
         // eprintln!("found: {} -> {:?}", segment.name, offset);
 
@@ -124,12 +135,14 @@ pub fn scan(match_file: &String, bin_file: &String, options: &mut Options) {
         let mut map = HashMap::new();
 
         for function in segment.functions {
-            let function_offset = find(function.signature,
-                                       function.size / 4,
-                                       &instructions,
-                                       offset / 4,
-                                       (offset + segment.size) / 4,
-                                       options);
+            let function_offset = find(
+                function.signature,
+                function.size / 4,
+                &instructions,
+                offset / 4,
+                (offset + segment.size) / 4,
+                options,
+            );
             // eprintln!("    found: {} -> {:?}", function.name, function_offset);
             if let Some(function_offset) = function_offset {
                 map.insert(function.name, function_offset);
@@ -138,15 +151,16 @@ pub fn scan(match_file: &String, bin_file: &String, options: &mut Options) {
 
         let so = SegmentOffset {
             name: segment.name,
-            offset: offset,
+            offset,
             size: segment.size,
             symbols: map,
         };
 
-        writeln!(*options.writer, "---\n{}",
-                 serde_yaml::to_string(&so).expect("yaml"))
-            .expect("writeln!");
+        writeln!(
+            *options.writer,
+            "---\n{}",
+            serde_yaml::to_string(&so).expect("yaml")
+        )
+        .expect("writeln!");
     }
 }
-
-

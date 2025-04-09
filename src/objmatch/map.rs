@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: BSD-3-CLAUSE
 
 use regex::Regex;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-
-
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct FunctionEntry {
@@ -29,36 +27,45 @@ impl ObjectMap {
         // this can be done with experimental file_prefix
         // function, but replicating logic here for stable
         Path::new(&self.object)
-            .file_name().expect("object name")
-            .to_str().unwrap()
-            .strip_suffix(".c.o").unwrap()
+            .file_name()
+            .expect("object name")
+            .to_str()
+            .unwrap()
+            .strip_suffix(".c.o")
+            .unwrap()
     }
 }
 
-
-
 enum EvaluateState {
-    Start, Entry
+    Start,
+    Entry,
 }
 
 pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
     let file = File::open(map_file).expect("Could not open map file");
-    let mut i = 0;
 
-
-    let rom_start_expr = Regex::new(r"(?xi)
+    let rom_start_expr = Regex::new(
+        r"(?xi)
         ^\s*
         0x([0-9A-F]+)\s+[^\s]+_ROM_START\s=\s
-    ").expect("regex");
+    ",
+    )
+    .expect("regex");
 
-    let vram_expr = Regex::new(r"(?xi)
+    let vram_expr = Regex::new(
+        r"(?xi)
         ^\s*
         0x([0-9A-F]+)\s+[^\s]+_VRAM\s=\s
-    ").expect("regex");
+    ",
+    )
+    .expect("regex");
 
-    let segment_expr = Regex::new(r"(?xi)
+    let segment_expr = Regex::new(
+        r"(?xi)
         ^\s[\w\-_.\/]+\.c\.o\(\.([a-z.]+)\)$
-    ").expect("regex");
+    ",
+    )
+    .expect("regex");
 
     let mut segments = Vec::<ObjectMap>::new();
 
@@ -74,8 +81,7 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
     let mut segment_offset: usize = 0;
     let mut segment_symbols = Vec::<FunctionEntry>::new();
 
-    for line in lines.map_while(Result::ok) {
-        i += 1;
+    for (i, line) in lines.map_while(Result::ok).enumerate() {
         // eprintln!("{i}: {line}");
         if let Some(capture) = rom_start_expr.captures(&line) {
             // eprintln!("{i}: {line}");
@@ -117,16 +123,16 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
             continue;
         }
 
-        let parts: Vec<&str> = line.trim().split_whitespace().collect();
+        let parts: Vec<&str> = line.split_whitespace().collect();
 
         // if this is not a text section, continue
-        if parts.len() == 4 && *parts.get(0).unwrap() != ".text" {
+        if parts.len() == 4 && *parts.first().unwrap() != ".text" {
             state = EvaluateState::Start;
             // eprintln!("{i} skipping, resetting state");
             continue;
         }
 
-        if *parts.get(0).unwrap() == ".text" {
+        if *parts.first().unwrap() == ".text" {
             if !first {
                 segments.push(ObjectMap {
                     object: segment_object,
@@ -138,11 +144,27 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
                 segment_symbols = Vec::new();
             }
             first = false;
-            segment_offset = usize::from_str_radix(parts.get(1).expect("segment
-            offset").strip_prefix("0x").unwrap(),
-            16).expect("segment offset base 16");
-            segment_size = usize::from_str_radix(parts.get(2).expect("segment size").strip_prefix("0x").unwrap(),
-            16).expect("segment size base 16");
+            segment_offset = usize::from_str_radix(
+                parts
+                    .get(1)
+                    .expect(
+                        "segment
+            offset",
+                    )
+                    .strip_prefix("0x")
+                    .unwrap(),
+                16,
+            )
+            .expect("segment offset base 16");
+            segment_size = usize::from_str_radix(
+                parts
+                    .get(2)
+                    .expect("segment size")
+                    .strip_prefix("0x")
+                    .unwrap(),
+                16,
+            )
+            .expect("segment size base 16");
             segment_object = parts.get(3).expect("segment object").to_string();
 
             // eprintln!("{i}: new entry {segment_object} #{segment_offset} #{segment_size}");
@@ -150,7 +172,15 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
             continue;
         }
 
-        let offset = usize::from_str_radix(parts.get(0).expect("symbol offset").strip_prefix("0x").expect("symbol value"), 16).expect("symbol offset base 16");
+        let offset = usize::from_str_radix(
+            parts
+                .first()
+                .expect("symbol offset")
+                .strip_prefix("0x")
+                .expect("symbol value"),
+            16,
+        )
+        .expect("symbol offset base 16");
         let function = parts.get(1).expect("symbol text");
 
         if function.ends_with(".NON_MATCHING") {
@@ -174,5 +204,5 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
 
     // eprintln!("segments: {segments:?}")
 
-    return segments;
+    segments
 }

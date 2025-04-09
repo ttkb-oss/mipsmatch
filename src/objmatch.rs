@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-CLAUSE
 
-use std::io::Write;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_with::{self, serde_as};
 use std::collections::HashMap;
+use std::io::Write;
 
 pub mod evaluate;
 pub mod map;
@@ -14,8 +14,6 @@ pub struct Options {
     pub radix: u64,
     pub writer: Box<dyn Write>,
 }
-
-
 
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -44,5 +42,3 @@ struct SegmentOffset {
     pub size: usize,
     pub symbols: HashMap<String, usize>,
 }
-
-
