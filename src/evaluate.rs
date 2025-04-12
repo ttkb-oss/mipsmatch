@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BSD-3-CLAUSE
 use serde_yaml::{self};
+use std::io::Write;
 
-use crate::objmatch::map::{read_segments, ObjectMap};
-use crate::objmatch::{FunctionSignature, Options, SegmentSignature};
+use crate::arch::mips;
+use crate::map::{read_segments, ObjectMap};
+use crate::{FunctionSignature, Options, SegmentSignature};
 
-fn sig_for_range(bytes: &[u8], offset: usize, size: usize, options: &Options) -> u64 {
+use crate::elf::{self};
+
+fn sig_for_range<W: Write>(bytes: &[u8], offset: usize, size: usize, options: &Options<W>) -> u64 {
     fn horner_hash(s: u32, acc: u64, radix: u64, q: u64) -> u64 {
         ((radix * acc) + (s as u64)) % q
     }
@@ -13,34 +17,18 @@ fn sig_for_range(bytes: &[u8], offset: usize, size: usize, options: &Options) ->
 
     for i in (offset..(offset + size)).step_by(4) {
         // get instruction
-        // TODO: make endianness optional
-        let instruction: u32 = ((bytes[i + 3] as u32) << 24)
-            | ((bytes[i + 2] as u32) << 16)
-            | ((bytes[i + 1] as u32) << 8)
-            | (bytes[i] as u32);
+        let instruction = mips::bytes_to_le_instruction(&bytes[i..(i + 4)]);
+        let masked_ins = mips::normalize_instruction(instruction);
 
-        // mask any fields which may refer to global symbols. this will
-        // mask false positives, but keep most immediates and local vars.
-        let masked_ins = match instruction >> 26 {
-            // r-type
-            0 => instruction,
-            // j-type
-            2 | 3 => instruction & 0xFC000000,
-            // i-type
-            _ => instruction & 0xFFFF0000,
-        };
-
-        acc = horner_hash(masked_ins, acc, options.radix, options.coefficient);
+        acc = horner_hash(masked_ins, acc, options.radix, options.modulus);
     }
 
     acc
 }
 
-fn calculate_object_hashes(map: &ObjectMap, bin_file: &String, options: &mut Options) {
-    let bytes = std::fs::read(bin_file).expect("Could not read bin file");
-
+fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mut Options<W>) {
     // calculate the signature of the entire object
-    let object_hash = sig_for_range(&bytes, map.offset, map.size, options);
+    let object_hash = sig_for_range(bytes, map.offset, map.size, options);
     // eprintln!("    {}: [{}, 0x{object_hash:08x}]", map.name(), map.size / 4);
     // eprintln!("{} size: {} key: 0x{object_hash:08x}", map.name(), map.size);
     // writeln!(*options.writer, "{}:", map.name());
@@ -55,7 +43,7 @@ fn calculate_object_hashes(map: &ObjectMap, bin_file: &String, options: &mut Opt
             map.offset + map.size - segment.offset
         };
 
-        let segment_hash = sig_for_range(&bytes, segment.offset, size, options);
+        let segment_hash = sig_for_range(bytes, segment.offset, size, options);
         // eprintln!("    {}: [{}, 0x{segment_hash:08x}]", segment.name, size / 4);
 
         functions.push(FunctionSignature {
@@ -73,19 +61,22 @@ fn calculate_object_hashes(map: &ObjectMap, bin_file: &String, options: &mut Opt
     };
 
     writeln!(
-        *options.writer,
+        options.writer,
         "---\n{}",
         serde_yaml::to_string(&sig).expect("yaml")
     )
     .expect("writeln!");
 }
 
-pub fn evaluate(map_file: &String, bin_file: &String, options: &mut Options) {
-    // eprintln!("evaluating {map_file}, {bin_file}");
-    let segments = read_segments(map_file);
+pub fn evaluate<W: Write>(map_file: &String, elf_file: &String, options: &mut Options<W>) {
+    let elf_symbols = elf::function_symbols(std::path::Path::new(elf_file));
+
+    let segments = read_segments(map_file, elf_symbols);
+
+    let bin_data = elf::bin_data(std::path::Path::new(elf_file));
 
     for map in segments {
         // eprintln!("    - [0x{:x}, c, {}]", map.offset, map.name());
-        calculate_object_hashes(&map, bin_file, options);
+        calculate_object_hashes(&map, &bin_data, options);
     }
 }

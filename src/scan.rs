@@ -3,45 +3,46 @@ use serde::{Deserialize, Serialize};
 use serde_with::{self, serde_as};
 use serde_yaml::{self};
 use std::collections::HashMap;
-use std::io::{self};
+use std::io::{self, Write};
 
-use crate::objmatch::Options;
+use crate::arch::mips;
+use crate::Options;
 
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct FunctionSignature {
-    name: String,
+pub struct FunctionSignature {
+    pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
-    signature: u64,
-    size: usize,
+    pub signature: u64,
+    pub size: usize,
 }
 
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct SegmentSignature {
-    name: String,
+pub struct SegmentSignature {
+    pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
-    signature: u64,
-    size: usize,
-    functions: Vec<FunctionSignature>,
+    pub signature: u64,
+    pub size: usize,
+    pub functions: Vec<FunctionSignature>,
 }
 
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct SegmentOffset {
-    name: String,
-    offset: usize,
-    size: usize,
-    symbols: HashMap<String, usize>,
+pub struct SegmentOffset {
+    pub name: String,
+    pub offset: usize,
+    pub size: usize,
+    pub symbols: HashMap<String, usize>,
 }
 
-fn find(
+fn find<W: Write>(
     signature: u64,
     size: usize,
     instructions: &[u32],
     start: usize,
     end: usize,
-    options: &mut Options,
+    options: &mut Options<W>,
 ) -> Option<usize> {
     let mut i = start;
     let mut offset = -1;
@@ -51,12 +52,12 @@ fn find(
     let mut rm: u64 = 1;
 
     for _ in 0..(size - 1) {
-        rm = (options.radix * rm) % options.coefficient;
+        rm = (options.radix * rm) % options.modulus;
     }
     // println!("rm {:08x} size: {}, count: {}", rm, size, count);
 
     while count < size && i < end {
-        hash = ((options.radix * hash) + instructions[i] as u64) % options.coefficient;
+        hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
 
         count += 1;
         i += 1;
@@ -68,10 +69,9 @@ fn find(
     }
 
     while hash != signature && i < end {
-        hash = (hash + options.coefficient
-            - (rm * instructions[i - count] as u64) % options.coefficient)
-            % options.coefficient;
-        hash = ((options.radix * hash) + instructions[i] as u64) % options.coefficient;
+        hash = (hash + options.modulus - (rm * instructions[i - count] as u64) % options.modulus)
+            % options.modulus;
+        hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
         i += 1;
     }
 
@@ -83,7 +83,7 @@ fn find(
     }
 }
 
-pub fn scan(match_file: &String, bin_file: &String, options: &mut Options) {
+pub fn scan<W: Write>(match_file: &String, bin_file: &String, options: &mut Options<W>) {
     // eprintln!("matching {match_file}, {bin_file}");
 
     let bytes = std::fs::read(bin_file).expect("Could not read bin file");
@@ -92,21 +92,8 @@ pub fn scan(match_file: &String, bin_file: &String, options: &mut Options) {
         .chunks(4)
         .map(|b| {
             // TODO: make endianness optional
-            let instruction: u32 = ((b[3] as u32) << 24)
-                | ((b[2] as u32) << 16)
-                | ((b[1] as u32) << 8)
-                | (b[0] as u32);
-
-            // mask any fields which may refer to global symbols. this will
-            // mask false positives, but keep most immediates and local vars.
-            match instruction >> 26 {
-                // r-type
-                0 => instruction,
-                // j-type
-                2 | 3 => instruction & 0xFC000000,
-                // i-type
-                _ => instruction & 0xFFFF0000,
-            }
+            let instruction = mips::bytes_to_le_instruction(b);
+            mips::normalize_instruction(instruction)
         })
         .collect();
 
@@ -134,19 +121,27 @@ pub fn scan(match_file: &String, bin_file: &String, options: &mut Options) {
 
         let mut map = HashMap::new();
 
+        let mut position = offset;
+        let function_len = segment.functions.len();
+
         for function in segment.functions {
             let function_offset = find(
                 function.signature,
                 function.size / 4,
                 &instructions,
-                offset / 4,
+                position / 4,
                 (offset + segment.size) / 4,
                 options,
             );
             // eprintln!("    found: {} -> {:?}", function.name, function_offset);
             if let Some(function_offset) = function_offset {
+                position = function_offset + function.size;
                 map.insert(function.name, function_offset);
             }
+        }
+
+        if function_len != map.len() {
+            continue;
         }
 
         let so = SegmentOffset {
@@ -157,7 +152,7 @@ pub fn scan(match_file: &String, bin_file: &String, options: &mut Options) {
         };
 
         writeln!(
-            *options.writer,
+            options.writer,
             "---\n{}",
             serde_yaml::to_string(&so).expect("yaml")
         )

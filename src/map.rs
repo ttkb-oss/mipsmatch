@@ -41,7 +41,40 @@ enum EvaluateState {
     Entry,
 }
 
-pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
+fn symbols_to_segment_symbols(
+    vram: usize,
+    offset: usize,
+    size: usize,
+    symbols: &[(usize, String)],
+) -> Vec<FunctionEntry> {
+    let mut entries: Vec<FunctionEntry> = symbols
+        .iter()
+        .filter(|(addr, _)| *addr >= offset && *addr < (offset + size))
+        .map(|(addr, name)| FunctionEntry {
+            name: name.to_string(),
+            vram: *addr,
+            offset: *addr - vram,
+        })
+        .collect();
+    entries.sort_by(|a, b| a.vram.cmp(&b.vram));
+    entries
+}
+
+// fn merge_entries_with_symbols(vram: usize, offset: usize, size: usize, entries: Vec<FunctionEntry>, symbols: Vec<(u32, String)> -> Vec<FunctionEntry> {
+//     let mut segment_symbols = symbols.iter().filter(|(addr, name)|
+//         let func_offset = addr - vram;
+//         func_offset >= offset && func_offset < (offset + size)
+//         ).sort(|(a, _), (b, _)| a <=> b)
+//         .collect();
+//
+//     let mut i = 0;
+//     let mut j = 0;
+//
+//     while segment_symbols.len() > 0 {
+//     }
+// }
+
+pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) -> Vec<ObjectMap> {
     let file = File::open(map_file).expect("Could not open map file");
 
     let rom_start_expr = Regex::new(
@@ -81,7 +114,7 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
     let mut segment_offset: usize = 0;
     let mut segment_symbols = Vec::<FunctionEntry>::new();
 
-    for (i, line) in lines.map_while(Result::ok).enumerate() {
+    for (_i, line) in lines.map_while(Result::ok).enumerate() {
         // eprintln!("{i}: {line}");
         if let Some(capture) = rom_start_expr.captures(&line) {
             // eprintln!("{i}: {line}");
@@ -132,8 +165,18 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
             continue;
         }
 
+        // if this is a text section, we're starting a new segment
         if *parts.first().unwrap() == ".text" {
             if !first {
+                // println!("functions from map: {:?}", segment_symbols);
+                // println!("symbols: {:?}", function_symbols);
+                segment_symbols = symbols_to_segment_symbols(
+                    vram - rom_start,
+                    segment_offset,
+                    segment_size,
+                    &function_symbols,
+                );
+                // println!("functions from elf: {:?}", segment_symbols);
                 segments.push(ObjectMap {
                     object: segment_object,
                     offset: segment_offset - vram + rom_start,
@@ -147,10 +190,7 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
             segment_offset = usize::from_str_radix(
                 parts
                     .get(1)
-                    .expect(
-                        "segment
-            offset",
-                    )
+                    .expect("segment offset")
                     .strip_prefix("0x")
                     .unwrap(),
                 16,
@@ -194,6 +234,7 @@ pub fn read_segments(map_file: &String) -> Vec<ObjectMap> {
             offset: offset - vram + rom_start,
         });
     }
+
     segments.push(ObjectMap {
         object: segment_object,
         offset: segment_offset - vram + rom_start,
