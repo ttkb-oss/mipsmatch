@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-CLAUSE
 use serde_yaml::{self};
 use std::io::Write;
+use std::path::Path;
 
 use crate::arch::mips;
 use crate::map::{read_segments, ObjectMap};
@@ -29,9 +30,6 @@ fn sig_for_range<W: Write>(bytes: &[u8], offset: usize, size: usize, options: &O
 fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mut Options<W>) {
     // calculate the signature of the entire object
     let object_hash = sig_for_range(bytes, map.offset, map.size, options);
-    // eprintln!("    {}: [{}, 0x{object_hash:08x}]", map.name(), map.size / 4);
-    // eprintln!("{} size: {} key: 0x{object_hash:08x}", map.name(), map.size);
-    // writeln!(*options.writer, "{}:", map.name());
 
     let mut functions = Vec::new();
 
@@ -44,7 +42,6 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
         };
 
         let segment_hash = sig_for_range(bytes, segment.offset, size, options);
-        // eprintln!("    {}: [{}, 0x{segment_hash:08x}]", segment.name, size / 4);
 
         functions.push(FunctionSignature {
             name: segment.name.clone(),
@@ -68,15 +65,14 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
     .expect("writeln!");
 }
 
-pub fn evaluate<W: Write>(map_file: &String, elf_file: &String, options: &mut Options<W>) {
-    let elf_symbols = elf::function_symbols(std::path::Path::new(elf_file));
+pub fn evaluate<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Options<W>) {
+    let elf_symbols = elf::function_symbols(elf_file);
 
     let segments = read_segments(map_file, elf_symbols);
 
-    let bin_data = elf::bin_data(std::path::Path::new(elf_file));
+    let bin_data = elf::bin_data(elf_file);
 
     for map in segments {
-        // eprintln!("    - [0x{:x}, c, {}]", map.offset, map.name());
         calculate_object_hashes(&map, &bin_data, options);
     }
 }

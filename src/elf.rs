@@ -34,7 +34,7 @@ pub fn bin_data(elf_path: &Path) -> Vec<u8> {
 pub fn function_symbols(elf_path: &Path) -> Vec<(usize, String)> {
     let file_data = std::fs::read(elf_path).expect("Could not read file.");
     let slice = file_data.as_slice();
-    let file = ElfBytes::<AnyEndian>::minimal_parse(slice).expect("Open test1");
+    let file = ElfBytes::<AnyEndian>::minimal_parse(slice).expect("valid elf file");
 
     let (symtab, strtab) = file
         .symbol_table()
@@ -54,9 +54,8 @@ pub fn function_symbols(elf_path: &Path) -> Vec<(usize, String)> {
         .collect()
 }
 
-pub fn elf<W: Write>(elf_file: &String, options: &mut Options<W>) {
-    let path = std::path::PathBuf::from(elf_file);
-    let file_data = std::fs::read(path).expect("Could not read file.");
+pub fn inspect_elf<W: Write>(elf_file: &Path, options: &mut Options<W>) {
+    let file_data = std::fs::read(elf_file).expect("Could not read file.");
     let slice = file_data.as_slice();
     let file = ElfBytes::<AnyEndian>::minimal_parse(slice).expect("Open test1");
     let (shdrs_opt, strtab_opt) = file

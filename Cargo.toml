@@ -11,3 +11,20 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_with = "3.12.0"
 serde-hex = "0.1.0"
+
+[package.metadata.deb]
+maintainer = "Jonathan Hohle <jon@ttkb.co>"
+copyright = "2025, TTKB, LLC."
+license-file = ["LICENSE.TXT", "2"]
+extended-description = """\
+A utility for finding duplicates when decompiling several overlays
+"""
+depends = "$auto"
+section = "development"
+priority = "optional"
+assets = [
+    # target/release path is special, and gets replaced by cargo-deb with the actual target dir path.
+    ["target/release/mipsmatch", "usr/bin/", "755"],
+    # both array and object syntaxes are equivalent:
+    { source = "README.md", dest = "usr/share/doc/mipsmatch/README", mode = "644"},
+]

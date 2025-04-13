@@ -1,0 +1,200 @@
+
+Discarded input sections
+
+ .reginfo       0x00000000       0x18 build/us/src/servant/tt_004/sword.c.o
+ .MIPS.abiflags
+                0x00000000       0x18 build/us/src/servant/tt_004/sword.c.o
+ .pdr           0x00000000       0x40 build/us/src/servant/tt_004/sword.c.o
+ .debug_line    0x00000000       0x53 build/us/src/servant/tt_004/sword.c.o
+ .debug_info    0x00000000       0x46 build/us/src/servant/tt_004/sword.c.o
+ .debug_abbrev  0x00000000       0x28 build/us/src/servant/tt_004/sword.c.o
+ .debug_aranges
+                0x00000000       0x20 build/us/src/servant/tt_004/sword.c.o
+ .debug_str     0x00000000       0x6a build/us/src/servant/tt_004/sword.c.o
+ .gnu.attributes
+                0x00000000       0x10 build/us/src/servant/tt_004/sword.c.o
+ .reginfo       0x00000000       0x18 build/us/src/servant/tt_004/servant_common.c.o
+ .MIPS.abiflags
+                0x00000000       0x18 build/us/src/servant/tt_004/servant_common.c.o
+ .pdr           0x00000000       0x60 build/us/src/servant/tt_004/servant_common.c.o
+ .debug_line    0x00000000       0x57 build/us/src/servant/tt_004/servant_common.c.o
+ .debug_info    0x00000000       0x55 build/us/src/servant/tt_004/servant_common.c.o
+ .debug_abbrev  0x00000000       0x28 build/us/src/servant/tt_004/servant_common.c.o
+ .debug_aranges
+                0x00000000       0x20 build/us/src/servant/tt_004/servant_common.c.o
+ .debug_str     0x00000000       0x8a build/us/src/servant/tt_004/servant_common.c.o
+ .gnu.attributes
+                0x00000000       0x10 build/us/src/servant/tt_004/servant_common.c.o
+ .text          0x00000000        0x0 build/us/src/servant/tt_004/sword_sprite_data.c.o
+ .bss           0x00000000        0x0 build/us/src/servant/tt_004/sword_sprite_data.c.o
+ .reginfo       0x00000000       0x18 build/us/src/servant/tt_004/sword_sprite_data.c.o
+ .MIPS.abiflags
+                0x00000000       0x18 build/us/src/servant/tt_004/sword_sprite_data.c.o
+ .pdr           0x00000000        0x0 build/us/src/servant/tt_004/sword_sprite_data.c.o
+ .gnu.attributes
+                0x00000000       0x10 build/us/src/servant/tt_004/sword_sprite_data.c.o
+ .text          0x00000000        0x0 build/us/src/servant/tt_004/sword_data.c.o
+ .bss           0x00000000        0x0 build/us/src/servant/tt_004/sword_data.c.o
+ .reginfo       0x00000000       0x18 build/us/src/servant/tt_004/sword_data.c.o
+ .MIPS.abiflags
+                0x00000000       0x18 build/us/src/servant/tt_004/sword_data.c.o
+ .pdr           0x00000000        0x0 build/us/src/servant/tt_004/sword_data.c.o
+ .gnu.attributes
+                0x00000000       0x10 build/us/src/servant/tt_004/sword_data.c.o
+ .text          0x00000000        0x0 build/us/src/servant/tt_004/servant_events.c.o
+ .bss           0x00000000        0x0 build/us/src/servant/tt_004/servant_events.c.o
+ .reginfo       0x00000000       0x18 build/us/src/servant/tt_004/servant_events.c.o
+ .MIPS.abiflags
+                0x00000000       0x18 build/us/src/servant/tt_004/servant_events.c.o
+ .pdr           0x00000000        0x0 build/us/src/servant/tt_004/servant_events.c.o
+ .gnu.attributes
+                0x00000000       0x10 build/us/src/servant/tt_004/servant_events.c.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD build/us/src/servant/tt_004/sword.c.o
+LOAD build/us/src/servant/tt_004/servant_common.c.o
+LOAD build/us/src/servant/tt_004/sword_sprite_data.c.o
+LOAD build/us/src/servant/tt_004/sword_data.c.o
+LOAD build/us/src/servant/tt_004/servant_events.c.o
+                0x00000a64                        __romPos = 0x0
+                0x00000000                        _gp = 0x0
+                0x00000000                        tt_004_ROM_START = __romPos
+                0x80170000                        tt_004_VRAM = ADDR (.tt_004)
+
+.tt_004         0x80170000      0xa64 load address 0x00000000
+ FILL mask 0x00000000
+                0x80170000                        tt_004_DATA_START = .
+                0x80170000                        sword_c = .
+ build/us/src/servant/tt_004/sword.c.o(.data)
+ .data          0x80170000        0x4 build/us/src/servant/tt_004/sword.c.o
+                0x80170004                        servant_common_c = .
+ build/us/src/servant/tt_004/servant_common.c.o(.data)
+ .data          0x80170004        0x4 build/us/src/servant/tt_004/servant_common.c.o
+                0x80170008                        sword_sprite_data_c = .
+ build/us/src/servant/tt_004/sword_sprite_data.c.o(.data)
+ .data          0x80170008        0x0 build/us/src/servant/tt_004/sword_sprite_data.c.o
+                0x80170008                        sword_data_c = .
+ build/us/src/servant/tt_004/sword_data.c.o(.data)
+ .data          0x80170008        0x0 build/us/src/servant/tt_004/sword_data.c.o
+                0x80170008                        servant_events_c = .
+ build/us/src/servant/tt_004/servant_events.c.o(.data)
+ .data          0x80170008      0x94c build/us/src/servant/tt_004/servant_events.c.o
+                0x80170008                g_Events
+                0x80170938                g_PlaySfxStep
+                0x8017093c                g_EntityRanges
+                0x80170944                g_EventQueue
+                0x80170948                g_CurrentServant
+                0x8017094c                g_CurrentRoomX
+                0x80170950                g_CurrentRoomY
+                0x80170954                        . = ALIGN (., 0x4)
+                0x80170954                        tt_004_DATA_END = .
+                0x00000954                        tt_004_DATA_SIZE = ABSOLUTE ((tt_004_DATA_END - tt_004_DATA_START))
+                0x80170954                        tt_004_RODATA_START = .
+ build/us/src/servant/tt_004/sword.c.o(.rodata)
+ .rodata        0x80170954       0x34 build/us/src/servant/tt_004/sword.c.o
+ build/us/src/servant/tt_004/servant_common.c.o(.rodata)
+                0x80170988                        . = ALIGN (., 0x4)
+                0x80170988                        tt_004_RODATA_END = .
+                0x00000034                        tt_004_RODATA_SIZE = ABSOLUTE ((tt_004_RODATA_END - tt_004_RODATA_START))
+                0x80170988                        tt_004_TEXT_START = .
+ build/us/src/servant/tt_004/sword.c.o(.text)
+ .text          0x80170988       0x80 build/us/src/servant/tt_004/sword.c.o
+                0x80170998                hello_world
+ build/us/src/servant/tt_004/servant_common.c.o(.text)
+ .text          0x80170a08       0x54 build/us/src/servant/tt_004/servant_common.c.o
+                0x80170a18                global_function
+                0x80170a38                global_function_2
+                0x80170a5c                        . = ALIGN (., 0x4)
+                0x80170a5c                        tt_004_TEXT_END = .
+                0x000000d4                        tt_004_TEXT_SIZE = ABSOLUTE ((tt_004_TEXT_END - tt_004_TEXT_START))
+                0x80170a5c                        tt_004_BSS_START = .
+ build/us/src/servant/tt_004/sword.c.o(.bss)
+ .bss           0x80170a5c        0x4 build/us/src/servant/tt_004/sword.c.o
+                0x80170a5c                bss_global
+ build/us/src/servant/tt_004/servant_common.c.o(.bss)
+ .bss           0x80170a60        0x4 build/us/src/servant/tt_004/servant_common.c.o
+                0x80170a60                local_bss
+                0x80170a64                        . = ALIGN (., 0x4)
+                0x80170a64                        tt_004_BSS_END = .
+                0x00000008                        tt_004_BSS_SIZE = ABSOLUTE ((tt_004_BSS_END - tt_004_BSS_START))
+                0x00000a64                        __romPos = (__romPos + SIZEOF (.tt_004))
+                0x00000a64                        __romPos = ALIGN (__romPos, 0x4)
+                0x80170a64                        . = ALIGN (., 0x4)
+                0x00000a64                        tt_004_ROM_END = __romPos
+                0x80170a64                        tt_004_VRAM_END = .
+
+/DISCARD/
+ *(*)
+                0x8003c774                        g_api = 0x8003c774
+                0x8003cb08                        g_GpuBuffers = 0x8003cb08
+                0x8006cbcc                        g_Clut = 0x8006cbcc
+                0x8006ed0c                        D_8006ED0C = 0x8006ed0c
+                0x8006ed2c                        D_8006ED2C = 0x8006ed2c
+                0x8006ed4c                        D_8006ED4C = 0x8006ed4c
+                0x80072bd0                        g_Player = 0x80072bd0
+                0x80073084                        g_Tilemap = 0x80073084
+                0x800730d8                        g_BgLayers = 0x800730d8
+                0x800973f8                        g_unkGraphicsStruct = 0x800973f8
+                0x80097490                        g_pads = 0x80097490
+                0x80097964                        g_Status = 0x80097964
+                0x80097d1c                        g_PlayerDraw = 0x80097d1c
+                0x80170000                        g_ServantDesc = 0x80170000
+                0x8017d000                        D_8017D000 = 0x8017d000
+                0x8003bdec                        g_CastleFlags = 0x8003bdec
+                0x8003c704                        g_CutsceneHasControl = 0x8003c704
+                0x8003c708                        D_8003C708 = 0x8003c708
+                0x8003c7b4                        g_api_FreePrimitives = 0x8003c7b4
+                0x8003c7b8                        g_api_AllocPrimitives = 0x8003c7b8
+                0x8003c7cc                        g_api_GetFreeEntity = 0x8003c7cc
+                0x8003c7dc                        g_api_PlaySfx = 0x8003c7dc
+                0x8003c7f8                        g_api_func_80131F68 = 0x8003c7f8
+                0x8003c84c                        g_api_AddToInventory = 0x8003c84c
+                0x8003c874                        g_api_GetServantStats = 0x8003c874
+                0x8003c880                        g_api_CdSoundCommandQueueEmpty = 0x8003c880
+                0x8003c884                        g_api_func_80133950 = 0x8003c884
+                0x8003c8b8                        g_PauseAllowed = 0x8003c8b8
+                0x8006cbc4                        g_Servant = 0x8006cbc4
+                0x8006cbcc                        g_Clut = 0x8006cbcc
+                0x80072f20                        D_80072F20 = 0x80072f20
+                0x80072f70                        D_80072F70 = 0x80072f70
+                0x80072f72                        D_80072F72 = 0x80072f72
+                0x80072f90                        D_80072F90 = 0x80072f90
+                0x80073084                        g_Tilemap = 0x80073084
+                0x800733d8                        g_Entities = 0x800733d8
+                0x800733dc                        PLAYER_posY_val = 0x800733dc
+                0x800733e0                        PLAYER_velocityX = 0x800733e0
+                0x800733e4                        PLAYER_velocityY = 0x800733e4
+                0x800733ec                        PLAYER_facingLeft = 0x800733ec
+                0x800733fc                        PLAYER_zPriority = 0x800733fc
+                0x80073404                        PLAYER_step = 0x80073404
+                0x80073406                        PLAYER_step_s = 0x80073406
+                0x800736c8                        D_800736C8 = 0x800736c8
+                0x80073784                        D_80073784 = 0x80073784
+                0x800762d8                        g_Entities_64 = 0x800762d8
+                0x80076316                        D_80076316 = 0x80076316
+                0x80086fec                        g_PrimBuf = 0x80086fec
+                0x800973f8                        g_unkGraphicsStruct = 0x800973f8
+                0x800974a0                        g_StageId = 0x800974a0
+                0x80097964                        g_Status = 0x80097964
+                0x80170356                        D_us_80170356 = 0x80170356
+                0x80170de6                        D_us_80170DE6 = 0x80170de6
+                0x8017231a                        D_us_8017231A = 0x8017231a
+                0x80012b24                        LoadImage = 0x80012b24
+                0x800160e4                        rand = 0x800160e4
+                0x80016c9c                        rsin = 0x80016c9c
+                0x80016d68                        rcos = 0x80016d68
+                0x80016eec                        SquareRoot0 = 0x80016eec
+                0x8001721c                        SquareRoot12 = 0x8001721c
+                0x800172bc                        CompMatrix = 0x800172bc
+                0x80017cdc                        TransMatrix = 0x80017cdc
+                0x8001803c                        SetGeomOffset = 0x8001803c
+                0x8001830c                        NormalClip = 0x8001830c
+                0x800186ac                        RotMatrix = 0x800186ac
+                0x800190ac                        ratan2 = 0x800190ac
+OUTPUT(build/us/tt_004.elf elf32-tradlittlemips)

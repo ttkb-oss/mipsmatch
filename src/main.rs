@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: BSD-3-CLAUSE
+
+use mipsmatch::cli;
+
 fn main() {
-    mipsmatch::mipsmatch_main();
+    cli::main();
 }

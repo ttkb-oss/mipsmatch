@@ -4,6 +4,7 @@ use serde_with::{self, serde_as};
 use serde_yaml::{self};
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::path::Path;
 
 use crate::arch::mips;
 use crate::Options;
@@ -54,7 +55,6 @@ fn find<W: Write>(
     for _ in 0..(size - 1) {
         rm = (options.radix * rm) % options.modulus;
     }
-    // println!("rm {:08x} size: {}, count: {}", rm, size, count);
 
     while count < size && i < end {
         hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
@@ -63,7 +63,6 @@ fn find<W: Write>(
         i += 1;
     }
 
-    // println!("count: {}", count);
     if i >= instructions.len() {
         return None;
     }
@@ -78,14 +77,11 @@ fn find<W: Write>(
     if hash == signature {
         Some((i - count) * 4)
     } else {
-        // println!("sig: {} hash: {}, i: {}", signature, hash, i);
         None
     }
 }
 
-pub fn scan<W: Write>(match_file: &String, bin_file: &String, options: &mut Options<W>) {
-    // eprintln!("matching {match_file}, {bin_file}");
-
+pub fn scan<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Options<W>) {
     let bytes = std::fs::read(bin_file).expect("Could not read bin file");
 
     let instructions: Vec<u32> = bytes
@@ -100,8 +96,6 @@ pub fn scan<W: Write>(match_file: &String, bin_file: &String, options: &mut Opti
     let f = std::fs::File::open(match_file).unwrap();
     for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
         let segment = SegmentSignature::deserialize(document).unwrap();
-        // println!("{:?}", segment );
-        // eprintln!("segment: {}", segment.name);
 
         // try to find the entire object, first
         let offset = find(
@@ -112,8 +106,6 @@ pub fn scan<W: Write>(match_file: &String, bin_file: &String, options: &mut Opti
             instructions.len(),
             options,
         );
-
-        // eprintln!("found: {} -> {:?}", segment.name, offset);
 
         let Some(offset) = offset else {
             continue;
@@ -133,7 +125,6 @@ pub fn scan<W: Write>(match_file: &String, bin_file: &String, options: &mut Opti
                 (offset + segment.size) / 4,
                 options,
             );
-            // eprintln!("    found: {} -> {:?}", function.name, function_offset);
             if let Some(function_offset) = function_offset {
                 position = function_offset + function.size;
                 map.insert(function.name, function_offset);

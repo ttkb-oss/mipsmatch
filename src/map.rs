@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: BSD-3-CLAUSE
-
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -74,7 +73,7 @@ fn symbols_to_segment_symbols(
 //     }
 // }
 
-pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) -> Vec<ObjectMap> {
+pub fn read_segments(map_file: &Path, function_symbols: Vec<(usize, String)>) -> Vec<ObjectMap> {
     let file = File::open(map_file).expect("Could not open map file");
 
     let rom_start_expr = Regex::new(
@@ -112,21 +111,16 @@ pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) 
     let mut segment_object = "".to_string();
     let mut segment_size: usize = 0;
     let mut segment_offset: usize = 0;
-    let mut segment_symbols = Vec::<FunctionEntry>::new();
 
     for (_i, line) in lines.map_while(Result::ok).enumerate() {
-        // eprintln!("{i}: {line}");
         if let Some(capture) = rom_start_expr.captures(&line) {
-            // eprintln!("{i}: {line}");
             if let Some(address) = capture.get(1).map(|m| m.as_str().to_string()) {
                 rom_start = usize::from_str_radix(address.as_str(), 16).expect("hex string");
-                // eprintln!("rom_start {rom_start}")
             }
             continue;
         }
 
         if let Some(capture) = vram_expr.captures(&line) {
-            // eprintln!("{i}: {line}");
             if let Some(address) = capture.get(1).map(|m| m.as_str().to_string()) {
                 vram = usize::from_str_radix(address.as_str(), 16).expect("hex string");
             }
@@ -135,7 +129,6 @@ pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) 
 
         if let Some(capture) = segment_expr.captures(&line) {
             if let Some(segment_type) = capture.get(1).map(|m| m.as_str()) {
-                // eprintln!("{i} found new segment: {segment_type}");
                 match segment_type {
                     "text" => state = EvaluateState::Entry,
                     _ => state = EvaluateState::Start,
@@ -146,13 +139,11 @@ pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) 
 
         // if we're not in a text section, continue
         let EvaluateState::Entry = state else {
-            // eprintln!("{i} skipping, wrong state");
             continue;
         };
 
         // if this is setting vars, continue
         if line.contains(" = ") {
-            // eprintln!("{i} skipping, assignment");
             continue;
         }
 
@@ -161,22 +152,19 @@ pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) 
         // if this is not a text section, continue
         if parts.len() == 4 && *parts.first().unwrap() != ".text" {
             state = EvaluateState::Start;
-            // eprintln!("{i} skipping, resetting state");
             continue;
         }
 
         // if this is a text section, we're starting a new segment
         if *parts.first().unwrap() == ".text" {
             if !first {
-                // println!("functions from map: {:?}", segment_symbols);
-                // println!("symbols: {:?}", function_symbols);
-                segment_symbols = symbols_to_segment_symbols(
+                let segment_symbols = symbols_to_segment_symbols(
                     vram - rom_start,
                     segment_offset,
                     segment_size,
                     &function_symbols,
                 );
-                // println!("functions from elf: {:?}", segment_symbols);
+
                 segments.push(ObjectMap {
                     object: segment_object,
                     offset: segment_offset - vram + rom_start,
@@ -184,7 +172,6 @@ pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) 
                     size: segment_size,
                     text_symbols: segment_symbols,
                 });
-                segment_symbols = Vec::new();
             }
             first = false;
             segment_offset = usize::from_str_radix(
@@ -207,8 +194,6 @@ pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) 
             .expect("segment size base 16");
             segment_object = parts.get(3).expect("segment object").to_string();
 
-            // eprintln!("{i}: new entry {segment_object} #{segment_offset} #{segment_size}");
-
             continue;
         }
 
@@ -227,13 +212,20 @@ pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) 
             continue;
         }
 
-        // eprintln!("    -> {function} {offset}");
-        segment_symbols.push(FunctionEntry {
-            name: function.to_string(),
-            vram: offset,
-            offset: offset - vram + rom_start,
-        });
+        // TODO: cross check map and elf symbols?
+        // segment_symbols.push(FunctionEntry {
+        //     name: function.to_string(),
+        //     vram: offset,
+        //     offset: offset - vram + rom_start,
+        // });
     }
+
+    let segment_symbols = symbols_to_segment_symbols(
+        vram - rom_start,
+        segment_offset,
+        segment_size,
+        &function_symbols,
+    );
 
     segments.push(ObjectMap {
         object: segment_object,
@@ -242,8 +234,6 @@ pub fn read_segments(map_file: &String, function_symbols: Vec<(usize, String)>) 
         size: segment_size,
         text_symbols: segment_symbols,
     });
-
-    // eprintln!("segments: {segments:?}")
 
     segments
 }
