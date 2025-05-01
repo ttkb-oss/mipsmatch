@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::fs::File;

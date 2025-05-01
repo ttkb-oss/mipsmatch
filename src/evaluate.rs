@@ -1,7 +1,9 @@
+// SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
 use serde_yaml::{self};
 use std::io::Write;
 use std::path::Path;
+use mapfile_parser::MapFile;
 
 use crate::arch::mips;
 use crate::map::{read_segments, ObjectMap};

@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
 use serde::{Deserialize, Serialize};
 use serde_with::{self, serde_as};

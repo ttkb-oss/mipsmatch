@@ -6,11 +6,14 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
 elf = "0.7.4"
+mapfile_parser = "2.7.3"
+rabbitizer = "1.13.0"
 regex = "1.11.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_with = "3.12.0"
 serde-hex = "0.1.0"
+llvm-tools = "0.1.1"
 
 [package.metadata.deb]
 maintainer = "Jonathan Hohle <jon@ttkb.co>"

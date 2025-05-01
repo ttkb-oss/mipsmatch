@@ -45,6 +45,34 @@ Example:
 mipsmatch scan build/us/match.cen.yaml disks/us/ST/RNO3/RNO3.BIN
 ```
 
+The output format is a YAML stream where the top-level element in each document is a map with the following keys:
+
+| Field      | Type    | Description      |
+| ---------- | ------- | ---------------- |
+| `name`     | string  | The segment name |
+| `sections` | map     | A map where keys are a section type and values contain section information described below |
+
+The section map
+
+| Field     | Type    | Description       |
+| --------- | ------- | ----------------- |
+| `offset`  | size\_t | The offset in the scanned
+| `size`    | size\_t |
+| `section` | map     | A map where the key is the section type and the value is a map of symbol to offset |
+---
+name: prim_helpers
+offset: 301360
+size: 2096
+symbols:
+  UnkPrimHelper: 301360
+  PrimDecreaseBrightness: 303356
+  FindFirstUnkPrim2: 302744
+  FindFirstUnkPrim: 302696
+  UnkPolyFunc2: 303228
+  UnkPolyFunc0: 303312
+  PrimResetNext: 303004
+  UpdateAnimation: 302360
+  PrimToggleVisibility: 302868
 
 ## Use Cases
 
