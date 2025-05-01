@@ -1,7 +1,6 @@
-use mipsmatch::scan::SegmentSignature;
-use mipsmatch::Options;
+// SPDX-FileCopyrightText: © 2025 TTKB, LLC
+// SPDX-License-Identifier: BSD-3-CLAUSE
 use std::collections::HashMap;
-use std::io::{self, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
 
 use mipsmatch::elf;
 

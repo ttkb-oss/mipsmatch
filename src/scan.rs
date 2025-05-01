@@ -47,7 +47,7 @@ fn find<W: Write>(
     options: &mut Options<W>,
 ) -> Option<usize> {
     let mut i = start;
-    let mut offset = -1;
+    let offset = -1;
     let mut count = 0;
 
     let mut hash: u64 = 0;

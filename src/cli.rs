@@ -39,6 +39,8 @@ enum CLICommand {
         match_config: PathBuf,
         bin: PathBuf,
     },
+    /// Test target for ELF files
+    Elf { elf: PathBuf },
 }
 
 #[derive(ValueEnum, Clone, Default, Debug)]
@@ -84,6 +86,9 @@ pub fn main() {
             bin,
         } => {
             scan(&match_config, &bin, &mut options);
+        }
+        CLICommand::Elf { elf } => {
+            inspect_elf(&elf, &mut options);
         }
     }
 }

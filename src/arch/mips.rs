@@ -13,23 +13,23 @@ pub fn bytes_to_le_instruction(bytes: &[u8]) -> u32 {
 }
 
 enum InstrType {
-    INSTR_TYPE_UNKNOWN = 0,
-    INSTR_TYPE_J = 1,
-    INSTR_TYPE_I = 2,
-    INSTR_TYPE_R = 3,
-    INSTR_TYPE_REGIMM = 4,
-    INSTR_TYPE_MAX = 5,
+    InstrTypeUnknown = 0,
+    InstrTypeJ = 1,
+    InstrTypeI = 2,
+    InstrTypeR = 3,
+    InstrTypeRegImm = 4,
+    InstrTypeMax = 5,
 }
 
 impl InstrType {
     fn from_u32(instr_type: u32) -> Self {
         match instr_type {
-        1 => InstrType::INSTR_TYPE_J,
-        2 => InstrType::INSTR_TYPE_I,
-        3 => InstrType::INSTR_TYPE_R,
-        4 => InstrType::INSTR_TYPE_REGIMM,
-        5 => InstrType::INSTR_TYPE_MAX,
-        _ => InstrType::INSTR_TYPE_UNKNOWN
+        1 => InstrType::InstrTypeJ,
+        2 => InstrType::InstrTypeI,
+        3 => InstrType::InstrTypeR,
+        4 => InstrType::InstrTypeRegImm,
+        5 => InstrType::InstrTypeMax,
+        _ => InstrType::InstrTypeUnknown
         }
     }
 }
@@ -42,16 +42,16 @@ impl ToInstrType for Instruction {
     fn instr_type(&self) -> InstrType {
         let operands = self.get_operands_slice();
         if operands.len() == 1 && operands[0] == OperandType::cpu_label {
-            return InstrType::INSTR_TYPE_J;
+            return InstrType::InstrTypeJ;
         }
 
         if Some(&OperandType::cpu_branch_target_label) == operands.last() ||
             Some(&OperandType::cpu_immediate) == operands.last() ||
             Some(&OperandType::cpu_immediate_base) == operands.last() {
-            return InstrType::INSTR_TYPE_I;
+            return InstrType::InstrTypeI;
         }
 
-        return InstrType::INSTR_TYPE_R;
+        InstrType::InstrTypeR
     }
 }
 
@@ -62,18 +62,18 @@ pub fn normalize_instruction(instruction: u32) -> u32 {
     // // mask false positives, but keep most immediates and local vars.
 
     // match i.instr_type() {
-    // InstrType::INSTR_TYPE_R => instruction,
-    // InstrType::INSTR_TYPE_J => instruction & 0xFC000000,
+    // InstrType::InstrTypeR => instruction,
+    // InstrType::InstrTypeJ => instruction & 0xFC000000,
     // _ => instruction & 0xFFFF0000,
     // }
 
     let opcode = instruction >> 26;
     if opcode == 0 {
-        assert!(i.instr_type()  as u32 == InstrType::INSTR_TYPE_R as u32 )
+        assert!(i.instr_type()  as u32 == InstrType::InstrTypeR as u32 )
     } else if opcode == 2 || opcode == 3 {
-        assert!(i.instr_type()  as u32 == InstrType::INSTR_TYPE_J as u32 )
+        assert!(i.instr_type()  as u32 == InstrType::InstrTypeJ as u32 )
     } else {
-        assert!(i.instr_type() as u32 == InstrType::INSTR_TYPE_I as u32, "o = {}, i = {}", opcode, i.instr_type() as u32)
+        assert!(i.instr_type() as u32 == InstrType::InstrTypeI as u32, "o = {}, i = {}", opcode, i.instr_type() as u32)
     }
 
 
