@@ -19,6 +19,10 @@ file that does not have `map` or `elf` files.
 Match fingerprints are currently unstable and only gauranteed to match with the version of `mipsmatch` that generated
 them.
 
+`mipsmatch` was inspired by the `dups` tool written for [`sotn-decomp`](https://github.com/xeeynamo/sotn-decomp). Unlike
+`dups`, `mipsmatch` finds identical segments. The major advantage is that fingerprints can be versioned, curated, and
+distributed and finding matching fingerprints is a significantly cheaper operation than determining similarity.
+
 ## mipsmatch evaluate
 
 `evaluate` is used to calculate segment and function fingerprints for all text symbols. It takes a map file in GNU map

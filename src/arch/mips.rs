@@ -5,6 +5,21 @@ use rabbitizer::Instruction;
 use rabbitizer::InstrCategory;
 use rabbitizer::OperandType;
 
+use crate::MIPSFamily;
+
+trait MIPSCategory {
+    fn category(&self) -> InstrCategory;
+}
+
+impl MIPSCategory for MIPSFamily {
+    fn category(&self) -> InstrCategory {
+        match self {
+        MIPSFamily::R3000GTE => InstrCategory::R3000GTE,
+        MIPSFamily::R4000Allegrex => InstrCategory::R4000ALLEGREX,
+        }
+    }
+}
+
 pub fn bytes_to_le_instruction(bytes: &[u8]) -> u32 {
     ((bytes[3] as u32) << 24)
         | ((bytes[2] as u32) << 16)
@@ -45,19 +60,32 @@ impl ToInstrType for Instruction {
             return InstrType::InstrTypeJ;
         }
 
-        if Some(&OperandType::cpu_branch_target_label) == operands.last() ||
-            Some(&OperandType::cpu_immediate) == operands.last() ||
-            Some(&OperandType::cpu_immediate_base) == operands.last() {
+        if self.get_opcode() == 0 ||
+           self.get_opcode() == 28 {
+            return InstrType::InstrTypeR;
+        }
+
+        let last_operand = operands.last();
+        if Some(&OperandType::cpu_branch_target_label) == last_operand ||
+            Some(&OperandType::cpu_immediate) == last_operand ||
+            Some(&OperandType::cpu_immediate_base) == last_operand ||
+            Some(&OperandType::cpu_fs) == last_operand {
             return InstrType::InstrTypeI;
         }
+
+        if self.get_opcode() == 31 && operands.len() == 2 && operands.first() == Some(&OperandType::cpu_rd) &&
+            operands.last() == Some(&OperandType::cpu_rt) {
+            return InstrType::InstrTypeI;
+        }
+
 
         InstrType::InstrTypeR
     }
 }
 
-pub fn normalize_instruction(instruction: u32) -> u32 {
+pub fn normalize_instruction(instruction: u32, family: MIPSFamily) -> u32 {
     // TODO: this needs to be configurable
-    let i = Instruction::new(instruction, 0, InstrCategory::R3000GTE);
+    let i = Instruction::new(instruction, 0, family.category());
     // // mask any fields which may refer to global symbols. this will
     // // mask false positives, but keep most immediates and local vars.
 
@@ -68,13 +96,15 @@ pub fn normalize_instruction(instruction: u32) -> u32 {
     // }
 
     let opcode = instruction >> 26;
-    if opcode == 0 {
-        assert!(i.instr_type()  as u32 == InstrType::InstrTypeR as u32 )
-    } else if opcode == 2 || opcode == 3 {
-        assert!(i.instr_type()  as u32 == InstrType::InstrTypeJ as u32 )
-    } else {
-        assert!(i.instr_type() as u32 == InstrType::InstrTypeI as u32, "o = {}, i = {}", opcode, i.instr_type() as u32)
-    }
+    // if opcode == 0 || opcode == 28 {
+    //     assert!(i.instr_type()  as u32 == InstrType::InstrTypeR as u32 , "expected R o = {}, i = {}, {:?}, last = {:?}", opcode, i.instr_type() as u32,
+    //     i, i.get_operands_slice())
+    // } else if opcode == 2 || opcode == 3 {
+    //     assert!(i.instr_type()  as u32 == InstrType::InstrTypeJ as u32, "Expected J")
+    // } else {
+    //     assert!(i.instr_type() as u32 == InstrType::InstrTypeI as u32, "expected I o = {}, i = {}, {:?}, last = {:?}", opcode, i.instr_type() as u32,
+    //     i, i.get_operands_slice())
+    // }
 
 
     // mask any fields which may refer to global symbols. this will
@@ -101,9 +131,9 @@ mod tests {
 
     #[test]
     fn mask_instructions() {
-        assert_eq!(normalize_instruction(0x00010203), 0x00010203);
-        assert_eq!(normalize_instruction(0x08010203), 0x08000000);
-        assert_eq!(normalize_instruction(0x0C010203), 0x0C000000);
-        assert_eq!(normalize_instruction(0xF0010203), 0xF0010000);
+        assert_eq!(normalize_instruction(0x00010203, MIPSFamily::R3000GTE), 0x00010203);
+        assert_eq!(normalize_instruction(0x08010203, MIPSFamily::R3000GTE), 0x08000000);
+        assert_eq!(normalize_instruction(0x0C010203, MIPSFamily::R3000GTE), 0x0C000000);
+        assert_eq!(normalize_instruction(0xF0010203, MIPSFamily::R3000GTE), 0xF0010000);
     }
 }

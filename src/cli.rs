@@ -37,7 +37,7 @@ enum CLICommand {
         granularity: Granularity,
 
         match_config: PathBuf,
-        bin: PathBuf,
+        bin: Vec<PathBuf>,
     },
     /// Test target for ELF files
     Elf { elf: PathBuf },
@@ -85,7 +85,7 @@ pub fn main() {
             match_config,
             bin,
         } => {
-            scan(&match_config, &bin, &mut options);
+            scan(&match_config, bin, &mut options);
         }
         CLICommand::Elf { elf } => {
             inspect_elf(&elf, &mut options);

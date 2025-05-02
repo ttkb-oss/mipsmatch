@@ -5,38 +5,10 @@ use serde_with::{self, serde_as};
 use serde_yaml::{self};
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::arch::mips;
-use crate::Options;
-
-#[serde_as]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct FunctionSignature {
-    pub name: String,
-    // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
-    pub signature: u64,
-    pub size: usize,
-}
-
-#[serde_as]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct SegmentSignature {
-    pub name: String,
-    // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
-    pub signature: u64,
-    pub size: usize,
-    pub functions: Vec<FunctionSignature>,
-}
-
-#[serde_as]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct SegmentOffset {
-    pub name: String,
-    pub offset: usize,
-    pub size: usize,
-    pub symbols: HashMap<String, usize>,
-}
+use crate::{FunctionSignature, MIPSFamily, Options, SegmentOffset, SegmentSignature};
 
 fn find<W: Write>(
     signature: u64,
@@ -82,15 +54,30 @@ fn find<W: Write>(
     }
 }
 
-pub fn scan<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Options<W>) {
+pub fn scan<W: Write>(match_file: &Path, bin_files: Vec<PathBuf>, options: &mut Options<W>) {
+    for bin_file in bin_files.iter() {
+        scan_one(match_file, &bin_file, options)
+    }
+}
+
+pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Options<W>) {
     let bytes = std::fs::read(bin_file).expect("Could not read bin file");
+
+
+    let f = std::fs::File::open(match_file).unwrap();
+    for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
+        let segment = SegmentSignature::deserialize(document).unwrap();
+        options.mipsFamily = segment.family;
+        break;
+    }
+
 
     let instructions: Vec<u32> = bytes
         .chunks(4)
         .map(|b| {
             // TODO: make endianness optional
             let instruction = mips::bytes_to_le_instruction(b);
-            mips::normalize_instruction(instruction)
+            mips::normalize_instruction(instruction, options.mipsFamily)
         })
         .collect();
 

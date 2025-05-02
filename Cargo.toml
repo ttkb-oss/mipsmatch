@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
 elf = "0.7.4"
+itertools = "0.14.0"
 mapfile_parser = "2.7.3"
 rabbitizer = "1.13.0"
 regex = "1.11.1"

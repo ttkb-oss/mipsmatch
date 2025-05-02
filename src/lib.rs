@@ -30,10 +30,17 @@ struct Args {
 }
 */
 
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum MIPSFamily {
+    R3000GTE,
+    R4000Allegrex,
+}
+
 pub struct Options<W: Write> {
     pub modulus: u64,
     pub radix: u64,
     pub writer: W,
+    pub mipsFamily: MIPSFamily,
 }
 
 impl<W: Write> Options<W> {
@@ -43,6 +50,7 @@ impl<W: Write> Options<W> {
             modulus: 0xFFFFFFEF,
             radix: 4294967296,
             writer,
+            mipsFamily: MIPSFamily::R3000GTE,
         }
     }
 }
@@ -58,11 +66,12 @@ struct FunctionSignature {
 
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct SegmentSignature {
+pub struct SegmentSignature {
     pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
     pub signature: u64,
     pub size: usize,
+    pub family: MIPSFamily,
     pub functions: Vec<FunctionSignature>,
 }
 

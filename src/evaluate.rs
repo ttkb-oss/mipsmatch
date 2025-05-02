@@ -18,10 +18,11 @@ fn sig_for_range<W: Write>(bytes: &[u8], offset: usize, size: usize, options: &O
     let mut acc: u64 = 0;
 
     for i in (offset..(offset + size)).step_by(4) {
+        // println!("i: {} size: {} offset: {} bytes: {}", i, size, offset, bytes.len());
         // get instruction
         // println!("bytes: {} to {} of {}", i, i + 4, bytes.len());
         let instruction = mips::bytes_to_le_instruction(&bytes[i..(i + 4)]);
-        let masked_ins = mips::normalize_instruction(instruction);
+        let masked_ins = mips::normalize_instruction(instruction, options.mipsFamily);
 
         acc = horner_hash(masked_ins, acc, options.radix, options.modulus);
     }
@@ -57,6 +58,7 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
         name: map.name().to_string(),
         signature: object_hash,
         size: map.size,
+        family: options.mipsFamily,
         functions,
     };
 
@@ -72,6 +74,11 @@ pub fn evaluate<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Option
     let elf_symbols = elf::function_symbols(elf_file);
     let segments = read_segments(map_file, elf_symbols);
     let bin_data = elf::bin_data(elf_file);
+
+    if let Some(family) = elf::mips_family(elf_file) {
+        println!("family: {:?}", family);
+        options.mipsFamily = family;
+    }
 
     for map in segments {
         calculate_object_hashes(&map, &bin_data, options);

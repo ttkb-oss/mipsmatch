@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
+use itertools::Itertools;
 use mapfile_parser::MapFile;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -29,8 +30,7 @@ impl ObjectMap {
             .expect("object name")
             .to_str()
             .unwrap()
-            .strip_suffix(".c.o")
-            .unwrap()
+            .trim_end_matches(".c.o")
     }
 }
 
@@ -62,20 +62,36 @@ pub fn read_segments(map_file: &Path, function_symbols: Vec<(usize, String)>) ->
             segment
                 .files_list
                 .iter()
-                .map(|file| {
-                    let segment_object = file.filepath.to_str().unwrap();
-                    ObjectMap {
-                            object: segment_object.to_string(),
-                            offset: file.vrom.unwrap() as usize,
-                            vram: file.vram as usize,
-                            size: file.size as usize,
-                            text_symbols: symbols_to_segment_symbols(
+                .filter(|file| file.filepath.to_str().unwrap().ends_with(".c.o"))
+                .chunk_by(|file| file.filepath.clone())
+                .into_iter()
+                .map(|(filepath, files)| {
+
+                    let files = files.collect::<Vec<_>>();
+
+                    let (segment_offset, segment_vram) = files.first().map(|file|
+                        (file.vrom.unwrap() as usize, file.vram as usize))
+                        .unwrap();
+                    let text_symbols = files.iter()
+                        .flat_map(|file|
+                            symbols_to_segment_symbols(
                                 segment.vram as usize,
                                 file.vram as usize,
                                 file.size as usize,
-                                &function_symbols),
+                                &function_symbols))
+                        .collect::<Vec<_>>();
+                    let last = files.last().unwrap();
+                    let segment_size = (last.vrom.unwrap() + last.size) as usize - segment_offset;
+
+                    ObjectMap {
+                        object: filepath.to_str().unwrap().to_string(),
+                        offset: segment_offset,
+                        vram: segment_vram,
+                        size: segment_size,
+                        text_symbols,
                     }
                 })
+                .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>()
 }
