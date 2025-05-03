@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 use crate::arch::mips;
 use crate::{FunctionSignature, MIPSFamily, Options, SegmentOffset, SegmentSignature};
+use crate::SerializeToYAML;
 
 fn find<W: Write>(
     signature: u64,
@@ -129,11 +130,7 @@ pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Opti
             symbols: map,
         };
 
-        writeln!(
-            options.writer,
-            "---\n{}",
-            serde_yaml::to_string(&so).expect("yaml")
-        )
-        .expect("writeln!");
+        writeln!(options.writer, "---");
+        so.serialize_to_yaml(&mut options.writer);
     }
 }

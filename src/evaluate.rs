@@ -7,6 +7,7 @@ use std::path::Path;
 use crate::arch::mips;
 use crate::map::{read_segments, ObjectMap, FunctionEntry};
 use crate::{FunctionSignature, Options, SegmentSignature};
+use crate::SerializeToYAML;
 
 use crate::elf::{self};
 
@@ -59,12 +60,8 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
         functions,
     };
 
-    writeln!(
-        options.writer,
-        "---\n{}",
-        serde_yaml::to_string(&sig).expect("yaml")
-    )
-    .expect("writeln!");
+    writeln!(options.writer, "---");
+    sig.serialize_to_yaml(&mut options.writer);
 }
 
 pub fn evaluate<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Options<W>) {

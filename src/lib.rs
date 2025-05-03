@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSD-3-CLAUSE
 use serde::{Deserialize, Serialize};
 use serde_with::{self, serde_as};
+use serde_hex::{SerHex,StrictPfx};
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -55,6 +56,17 @@ impl<W: Write> Options<W> {
     }
 }
 
+// serde_yaml doesn't provide a straightforward way to
+// specify the representation of numeric fields. to
+// get around this, just serialize manually.
+pub trait SerializeToYAML {
+    fn serialize_to_yaml<W: Write>(&self, writer: &mut W) {
+        self.serialize_to_yaml_at_level(0, writer)
+    }
+
+    fn serialize_to_yaml_at_level<W: Write>(&self, level: usize, writer: &mut W);
+}
+
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct FunctionSignature {
@@ -75,6 +87,23 @@ pub struct SegmentSignature {
     pub functions: Vec<FunctionSignature>,
 }
 
+impl SerializeToYAML for SegmentSignature {
+    fn serialize_to_yaml_at_level<W: Write>(&self, level: usize, writer: &mut W) {
+        let indent = " ".repeat(level * 2);
+        writeln!(writer, "{}name: {}", indent, serde_yaml::to_string(&self.name).unwrap().trim());
+        writeln!(writer, "{}signature: 0x{:X}", indent, self.signature);
+        writeln!(writer, "{}size: 0x{:X}", indent, self.size);
+        writeln!(writer, "{}family: {}", indent, serde_yaml::to_string(&self.family).unwrap().trim());
+        writeln!(writer, "{}functions:", indent);
+
+        for function in self.functions.iter() {
+            writeln!(writer, "{}- name: {}", indent, serde_yaml::to_string(&function.name).unwrap().trim());
+            writeln!(writer, "{}  signature: 0x{:X}", indent, function.signature);
+            writeln!(writer, "{}  size: 0x{:X}", indent, function.size);
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct SegmentOffset {
@@ -82,4 +111,19 @@ struct SegmentOffset {
     pub offset: usize,
     pub size: usize,
     pub symbols: HashMap<String, usize>,
+}
+
+impl SerializeToYAML for SegmentOffset {
+    fn serialize_to_yaml_at_level<W: Write>(&self, level: usize, writer: &mut W) {
+        let indent = " ".repeat(level * 2);
+        writeln!(writer, "{}name: {}", indent, serde_yaml::to_string(&self.name).unwrap().trim());
+        writeln!(writer, "{}offset: 0x{:X}", indent, self.offset);
+        writeln!(writer, "{}size: 0x{:X}", indent, self.size);
+        writeln!(writer, "{}symbols:", indent);
+
+        for (symbol, offset) in self.symbols.iter() {
+            writeln!(writer, "{}  {}: 0x{:X}", indent, serde_yaml::to_string(&symbol).unwrap().trim(),
+                offset);
+        }
+    }
 }
