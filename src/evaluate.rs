@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::arch::mips;
-use crate::map::{read_segments, ObjectMap};
+use crate::map::{read_segments, ObjectMap, FunctionEntry};
 use crate::{FunctionSignature, Options, SegmentSignature};
 
 use crate::elf::{self};
@@ -31,26 +31,23 @@ fn sig_for_range<W: Write>(bytes: &[u8], offset: usize, size: usize, options: &O
 }
 
 fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mut Options<W>) {
+    // println!("map: {}", map.object);
+    // println!("\toffset: {}\n\tsize: {}\n\tlen: {}", map.offset, map.size, bytes.len());
     // calculate the signature of the entire object
     // println!("map: {} of {}", map.offset, map.size);
     let object_hash = sig_for_range(bytes, map.offset, map.size, options);
 
     let mut functions = Vec::new();
 
-    for i in 0..map.text_symbols.len() {
-        let segment = &map.text_symbols[i];
-        let size = if i < (map.text_symbols.len() - 1) {
-            map.text_symbols[i + 1].offset - segment.offset
-        } else {
-            map.offset + map.size - segment.offset
-        };
+    for symbol in map.text_symbols.iter() {
+        let segment_hash = sig_for_range(bytes, symbol.offset, symbol.size, options);
 
-        let segment_hash = sig_for_range(bytes, segment.offset, size, options);
+        // println!("getting sig for {} at 0x{:x}: {:x}", symbol.name, symbol.offset, symbol.size);
 
         functions.push(FunctionSignature {
-            name: segment.name.clone(),
+            name: symbol.name.clone(),
             signature: segment_hash,
-            size,
+            size: symbol.size,
         });
     }
 
@@ -76,7 +73,7 @@ pub fn evaluate<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Option
     let bin_data = elf::bin_data(elf_file);
 
     if let Some(family) = elf::mips_family(elf_file) {
-        println!("family: {:?}", family);
+        // println!("family: {:?}", family);
         options.mipsFamily = family;
     }
 

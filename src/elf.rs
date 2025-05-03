@@ -5,6 +5,7 @@ use elf::section::SectionHeader;
 use elf::ElfBytes;
 use std::io::Write;
 use std::path::Path;
+use crate::map::FunctionEntry;
 
 use crate::Options;
 use crate::MIPSFamily;
@@ -94,7 +95,15 @@ pub fn bin_data(elf_path: &Path) -> Vec<u8> {
     data.to_vec()
 }
 
-pub fn function_symbols(elf_path: &Path) -> Vec<(usize, String)> {
+pub struct Symbol {
+    pub name: String,
+    pub vram: u64,
+    pub size: Option<u64>,
+    pub vrom: Option<u64>,
+    pub align: Option<u64>,
+}
+
+pub fn function_symbols(elf_path: &Path) -> Vec<FunctionEntry> {
     let file_data = std::fs::read(elf_path).expect("Could not read file.");
     let slice = file_data.as_slice();
     let file = ElfBytes::<AnyEndian>::minimal_parse(slice).expect("valid elf file");
@@ -109,10 +118,12 @@ pub fn function_symbols(elf_path: &Path) -> Vec<(usize, String)> {
         /* .filter(|s| s.st_shndx != SHNDX_EXTERNAL) */
         .filter(|s| s.st_symtype() == elf::abi::STT_FUNC)
         .map(|s| {
-            (
-                s.st_value as usize,
-                strtab.get(s.st_name as usize).unwrap().to_string(),
-            )
+            FunctionEntry {
+                name: strtab.get(s.st_name as usize).unwrap().to_string(),
+                offset: 0,
+                vram: s.st_value as usize,
+                size: s.st_size as usize,
+            }
         })
         .collect()
 }
@@ -201,15 +212,15 @@ pub fn inspect_elf<W: Write>(elf_file: &Path, options: &mut Options<W>) {
     {
         // if sym.st_value == 991 {
         println!("{:<4}: FILE name: {:<30} shndx: {} value: {:08x} size: {} undef: {} type: {}: bind: {}, vis: {}",
-        i,
-        strtab.get(sym.st_name as usize).unwrap(),
-         sym.st_shndx,
-         sym.st_value,
-        sym.st_size,
-        sym.is_undefined(),
-        sym.st_symtype(),
-        sym.st_bind(),
-        sym.st_vis());
+            i,
+            strtab.get(sym.st_name as usize).unwrap(),
+            sym.st_shndx,
+            sym.st_value,
+            sym.st_size,
+            sym.is_undefined(),
+            sym.st_symtype(),
+            sym.st_bind(),
+            sym.st_vis());
         // }
     }
 
@@ -221,15 +232,15 @@ pub fn inspect_elf<W: Write>(elf_file: &Path, options: &mut Options<W>) {
     {
         // if sym.st_value == 991 {
         println!("{:<4}: name: {:<30} shndx: {} value: {:08x} size: {} undef: {} type: {}: bind: {}, vis: {}",
-        i,
-        strtab.get(sym.st_name as usize).unwrap(),
-         sym.st_shndx,
-         sym.st_value,
-        sym.st_size,
-        sym.is_undefined(),
-        sym.st_symtype(),
-        sym.st_bind(),
-        sym.st_vis());
+            i,
+            strtab.get(sym.st_name as usize).unwrap(),
+            sym.st_shndx,
+            sym.st_value,
+            sym.st_size,
+            sym.is_undefined(),
+            sym.st_symtype(),
+            sym.st_bind(),
+            sym.st_vis());
         // }
     }
 }

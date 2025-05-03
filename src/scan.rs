@@ -71,7 +71,6 @@ pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Opti
         break;
     }
 
-
     let instructions: Vec<u32> = bytes
         .chunks(4)
         .map(|b| {

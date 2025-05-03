@@ -13,7 +13,7 @@ fn test_tt_004() {
 
     let lookup: HashMap<String, usize> = elf_symbols
         .iter()
-        .map(|(addr, name)| (name.clone(), *addr))
+        .map(|entry| (entry.name.clone(), entry.vram))
         .collect();
 
     assert_eq!(*lookup.get("hello_world").unwrap(), 0x80170998 as usize);
