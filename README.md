@@ -1,16 +1,17 @@
 # mipsmatch
 
+`mipsmatch` is a tool for calculating fingerprints for overlay segments and functions and using those fingerprints to
+find identical code in other overlay files. This utility relies on GNU map and elf files created by `ld` at link time.\*
 
-`mipsmatch` is a tool for calculating fingerprints for overlay segments and functions that have been previously built
-and then searching for those signatures in other overlay files. This utility relies on GNU map and elf files created by
-`ld` at link time.\*
+When decompiling a program, especially games and other software written for specific hardware (consoles) using very
+specific compilers (SDKs) it is common for several files, or overlays to contain identical code. For example, multiple
+stages in a game may share functions, items may all have the same utility functions, code from a game engine may appear
+in overlays that are loaded dynamically, and most games will have statically linked code provided by the platform's SDK.
+`mipsmatch` helps identify those common segments, and for projects that have reused this common code, will identify
+segment offsets in new files that have yet to be decompiled.
 
-It's common for overlays of the same type to contain identical code. Multiple stages in a game may share functions,
-items may all have the same utility functions, and even code from a game engine may appear in overlays that are loaded
-dynamically. `mipsmatch` helps identify those common segments, and for projects that have reused this common code, will
-identify segment offsets in new files that have yet to be decompiled.
-
-This can be combined with `splat` to generate segment offsets.
+`mipsmatch` can help find segment offsets and symbol addresses when [`splat`](https://github.com/ethteck/splat). It can
+also help determine which SDK a game was compiled against, among other things.
 
 `mipsmap` operates in two stages - the first creates a "match" file which contains fingerprints for segments and each of
 the functions in that segment. The second stage uses that match file to find matches in another BIN file. This can be a
@@ -54,29 +55,27 @@ The output format is a YAML stream where the top-level element in each document 
 | Field      | Type    | Description      |
 | ---------- | ------- | ---------------- |
 | `name`     | string  | The segment name |
-| `sections` | map     | A map where keys are a section type and values contain section information described below |
+| `offset`   | number  | The offset where the segment was found in the file |
+| `size`     | number  | The size of the segment |
+| `symbols`  | symbol map | A map of symbol name to offset in the file |
 
-The section map
+Example match:
 
-| Field     | Type    | Description       |
-| --------- | ------- | ----------------- |
-| `offset`  | size\_t | The offset in the scanned
-| `size`    | size\_t |
-| `section` | map     | A map where the key is the section type and the value is a map of symbol to offset |
----
+```yaml
 name: prim_helpers
-offset: 301360
-size: 2096
+offset: 0x13270
+size: 0x830
 symbols:
-  UnkPrimHelper: 301360
-  PrimDecreaseBrightness: 303356
-  FindFirstUnkPrim2: 302744
-  FindFirstUnkPrim: 302696
-  UnkPolyFunc2: 303228
-  UnkPolyFunc0: 303312
-  PrimResetNext: 303004
-  UpdateAnimation: 302360
-  PrimToggleVisibility: 302868
+  FindFirstUnkPrim2: 0x137D8
+  PrimResetNext: 0x138DC
+  UnkPolyFunc2: 0x139BC
+  UnkPolyFunc0: 0x13A10
+  UnkPrimHelper: 0x13270
+  UpdateAnimation: 0x13658
+  PrimDecreaseBrightness: 0x13A3C
+  PrimToggleVisibility: 0x13854
+  FindFirstUnkPrim: 0x137A8
+```
 
 ## Use Cases
 

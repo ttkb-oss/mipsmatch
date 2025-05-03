@@ -71,11 +71,11 @@ pub fn read_segments(map_file: &Path, function_symbols: Vec<FunctionEntry>) -> V
                 .chunk_by(|file| file.filepath.clone())
                 .into_iter()
                 .map(|(filepath, files)| {
-
                     // println!("file: {}", filepath.display());
                     let files = files.collect::<Vec<_>>();
-                    let (segment_offset, segment_vram) = files.first().map(|file|
-                        (file.vrom.unwrap() as usize, file.vram as usize))
+                    let (segment_offset, segment_vram) = files
+                        .first()
+                        .map(|file| (file.vrom.unwrap() as usize, file.vram as usize))
                         .unwrap();
                     let last = files.last().unwrap();
 
@@ -83,19 +83,21 @@ pub fn read_segments(map_file: &Path, function_symbols: Vec<FunctionEntry>) -> V
                     // println!("\testimated sizes: {:x} {:x} {}", segment_offset, segment_vram, segment_size);
 
                     // println!("\tfunction sizes:");
-                    let text_symbols = files.iter()
+                    let text_symbols = files
+                        .iter()
                         // .inspect(|file|
-                            // println!("symbols: {:?}", file.symbols))
-
+                        // println!("symbols: {:?}", file.symbols))
                         // .inspect(|file|
-                            // println!("\t\t{:x} {:x} {:x}", segment.vram, file.vram, file.size))
-                        .flat_map(|file|
+                        // println!("\t\t{:x} {:x} {:x}", segment.vram, file.vram, file.size))
+                        .flat_map(|file| {
                             symbols_to_segment_symbols(
                                 segment.vram as usize,
                                 segment.vrom as usize,
                                 file.vram as usize,
                                 file.size as usize,
-                                &function_symbols))
+                                &function_symbols,
+                            )
+                        })
                         .collect::<Vec<_>>();
 
                     // println!("segment vrom: {}", segment.vrom);

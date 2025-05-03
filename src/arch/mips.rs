@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
 
-use rabbitizer::Instruction;
 use rabbitizer::InstrCategory;
+use rabbitizer::Instruction;
 use rabbitizer::OperandType;
 
 use crate::MIPSFamily;
@@ -14,8 +14,8 @@ trait MIPSCategory {
 impl MIPSCategory for MIPSFamily {
     fn category(&self) -> InstrCategory {
         match self {
-        MIPSFamily::R3000GTE => InstrCategory::R3000GTE,
-        MIPSFamily::R4000Allegrex => InstrCategory::R4000ALLEGREX,
+            MIPSFamily::R3000GTE => InstrCategory::R3000GTE,
+            MIPSFamily::R4000Allegrex => InstrCategory::R4000ALLEGREX,
         }
     }
 }
@@ -39,12 +39,12 @@ enum InstrType {
 impl InstrType {
     fn from_u32(instr_type: u32) -> Self {
         match instr_type {
-        1 => InstrType::InstrTypeJ,
-        2 => InstrType::InstrTypeI,
-        3 => InstrType::InstrTypeR,
-        4 => InstrType::InstrTypeRegImm,
-        5 => InstrType::InstrTypeMax,
-        _ => InstrType::InstrTypeUnknown
+            1 => InstrType::InstrTypeJ,
+            2 => InstrType::InstrTypeI,
+            3 => InstrType::InstrTypeR,
+            4 => InstrType::InstrTypeRegImm,
+            5 => InstrType::InstrTypeMax,
+            _ => InstrType::InstrTypeUnknown,
         }
     }
 }
@@ -60,24 +60,26 @@ impl ToInstrType for Instruction {
             return InstrType::InstrTypeJ;
         }
 
-        if self.get_opcode() == 0 ||
-           self.get_opcode() == 28 {
+        if self.get_opcode() == 0 || self.get_opcode() == 28 {
             return InstrType::InstrTypeR;
         }
 
         let last_operand = operands.last();
-        if Some(&OperandType::cpu_branch_target_label) == last_operand ||
-            Some(&OperandType::cpu_immediate) == last_operand ||
-            Some(&OperandType::cpu_immediate_base) == last_operand ||
-            Some(&OperandType::cpu_fs) == last_operand {
+        if Some(&OperandType::cpu_branch_target_label) == last_operand
+            || Some(&OperandType::cpu_immediate) == last_operand
+            || Some(&OperandType::cpu_immediate_base) == last_operand
+            || Some(&OperandType::cpu_fs) == last_operand
+        {
             return InstrType::InstrTypeI;
         }
 
-        if self.get_opcode() == 31 && operands.len() == 2 && operands.first() == Some(&OperandType::cpu_rd) &&
-            operands.last() == Some(&OperandType::cpu_rt) {
+        if self.get_opcode() == 31
+            && operands.len() == 2
+            && operands.first() == Some(&OperandType::cpu_rd)
+            && operands.last() == Some(&OperandType::cpu_rt)
+        {
             return InstrType::InstrTypeI;
         }
-
 
         InstrType::InstrTypeR
     }
@@ -106,7 +108,6 @@ pub fn normalize_instruction(instruction: u32, family: MIPSFamily) -> u32 {
     //     i, i.get_operands_slice())
     // }
 
-
     // mask any fields which may refer to global symbols. this will
     // mask false positives, but keep most immediates and local vars.
     match instruction >> 26 {
@@ -131,9 +132,21 @@ mod tests {
 
     #[test]
     fn mask_instructions() {
-        assert_eq!(normalize_instruction(0x00010203, MIPSFamily::R3000GTE), 0x00010203);
-        assert_eq!(normalize_instruction(0x08010203, MIPSFamily::R3000GTE), 0x08000000);
-        assert_eq!(normalize_instruction(0x0C010203, MIPSFamily::R3000GTE), 0x0C000000);
-        assert_eq!(normalize_instruction(0xF0010203, MIPSFamily::R3000GTE), 0xF0010000);
+        assert_eq!(
+            normalize_instruction(0x00010203, MIPSFamily::R3000GTE),
+            0x00010203
+        );
+        assert_eq!(
+            normalize_instruction(0x08010203, MIPSFamily::R3000GTE),
+            0x08000000
+        );
+        assert_eq!(
+            normalize_instruction(0x0C010203, MIPSFamily::R3000GTE),
+            0x0C000000
+        );
+        assert_eq!(
+            normalize_instruction(0xF0010203, MIPSFamily::R3000GTE),
+            0xF0010000
+        );
     }
 }

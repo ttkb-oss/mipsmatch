@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
+use crate::map::FunctionEntry;
 use elf::endian::AnyEndian;
 use elf::section::SectionHeader;
 use elf::ElfBytes;
 use std::io::Write;
 use std::path::Path;
-use crate::map::FunctionEntry;
 
-use crate::Options;
 use crate::MIPSFamily;
+use crate::Options;
 
 pub const SHNDX_EXTERNAL: u16 = 65521;
 
@@ -117,13 +117,11 @@ pub fn function_symbols(elf_path: &Path) -> Vec<FunctionEntry> {
         .iter()
         /* .filter(|s| s.st_shndx != SHNDX_EXTERNAL) */
         .filter(|s| s.st_symtype() == elf::abi::STT_FUNC)
-        .map(|s| {
-            FunctionEntry {
-                name: strtab.get(s.st_name as usize).unwrap().to_string(),
-                offset: 0,
-                vram: s.st_value as usize,
-                size: s.st_size as usize,
-            }
+        .map(|s| FunctionEntry {
+            name: strtab.get(s.st_name as usize).unwrap().to_string(),
+            offset: 0,
+            vram: s.st_value as usize,
+            size: s.st_size as usize,
         })
         .collect()
 }

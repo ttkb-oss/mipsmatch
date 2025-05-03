@@ -5,9 +5,9 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::arch::mips;
-use crate::map::{read_segments, ObjectMap, FunctionEntry};
-use crate::{FunctionSignature, Options, SegmentSignature};
+use crate::map::{read_segments, FunctionEntry, ObjectMap};
 use crate::SerializeToYAML;
+use crate::{FunctionSignature, Options, SegmentSignature};
 
 use crate::elf::{self};
 
@@ -34,7 +34,7 @@ fn sig_for_range<W: Write>(bytes: &[u8], offset: usize, size: usize, options: &O
 fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mut Options<W>) {
     // println!("map: {}", map.object);
     // println!("\toffset: {}\n\tsize: {}\n\tlen: {}", map.offset, map.size, bytes.len());
-    // calculate the signature of the entire object
+    // calculate the fingerprint of the entire object
     // println!("map: {} of {}", map.offset, map.size);
     let object_hash = sig_for_range(bytes, map.offset, map.size, options);
 
@@ -47,14 +47,14 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
 
         functions.push(FunctionSignature {
             name: symbol.name.clone(),
-            signature: segment_hash,
+            fingerprint: segment_hash,
             size: symbol.size,
         });
     }
 
     let sig = SegmentSignature {
         name: map.name().to_string(),
-        signature: object_hash,
+        fingerprint: object_hash,
         size: map.size,
         family: options.mipsFamily,
         functions,

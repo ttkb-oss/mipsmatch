@@ -8,11 +8,11 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::arch::mips;
-use crate::{FunctionSignature, MIPSFamily, Options, SegmentOffset, SegmentSignature};
 use crate::SerializeToYAML;
+use crate::{FunctionSignature, MIPSFamily, Options, SegmentOffset, SegmentSignature};
 
 fn find<W: Write>(
-    signature: u64,
+    fingerprint: u64,
     size: usize,
     instructions: &[u32],
     start: usize,
@@ -41,14 +41,14 @@ fn find<W: Write>(
         return None;
     }
 
-    while hash != signature && i < end {
+    while hash != fingerprint && i < end {
         hash = (hash + options.modulus - (rm * instructions[i - count] as u64) % options.modulus)
             % options.modulus;
         hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
         i += 1;
     }
 
-    if hash == signature {
+    if hash == fingerprint {
         Some((i - count) * 4)
     } else {
         None
@@ -63,7 +63,6 @@ pub fn scan<W: Write>(match_file: &Path, bin_files: Vec<PathBuf>, options: &mut 
 
 pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Options<W>) {
     let bytes = std::fs::read(bin_file).expect("Could not read bin file");
-
 
     let f = std::fs::File::open(match_file).unwrap();
     for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
@@ -87,7 +86,7 @@ pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Opti
 
         // try to find the entire object, first
         let offset = find(
-            segment.signature,
+            segment.fingerprint,
             segment.size / 4,
             &instructions,
             0,
@@ -106,7 +105,7 @@ pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Opti
 
         for function in segment.functions {
             let function_offset = find(
-                function.signature,
+                function.fingerprint,
                 function.size / 4,
                 &instructions,
                 position / 4,
