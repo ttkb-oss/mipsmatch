@@ -126,7 +126,7 @@ pub fn function_symbols(elf_path: &Path) -> Vec<FunctionEntry> {
         .collect()
 }
 
-pub fn inspect_elf<W: Write>(elf_file: &Path, options: &mut Options<W>) {
+pub fn inspect_elf<W: Write>(elf_file: &Path, _options: &mut Options<W>) {
     let file_data = std::fs::read(elf_file).expect("Could not read file.");
     let slice = file_data.as_slice();
     let file = ElfBytes::<AnyEndian>::minimal_parse(slice).expect("Open test1");
@@ -142,7 +142,8 @@ pub fn inspect_elf<W: Write>(elf_file: &Path, options: &mut Options<W>) {
         strtab_opt.expect("Should have strtab"),
     );
 
-    let unused_section_header: SectionHeader = shdrs
+    // unused section header
+    shdrs
         .iter()
         .filter(|shdr| shdr.sh_type != elf::abi::SHT_NULL)
         .inspect(|shdr| {

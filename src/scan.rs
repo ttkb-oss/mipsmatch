@@ -1,15 +1,14 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
-use serde::{Deserialize, Serialize};
-use serde_with::{self, serde_as};
+use serde::Deserialize;
 use serde_yaml::{self};
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::arch::mips;
 use crate::SerializeToYAML;
-use crate::{FunctionSignature, MIPSFamily, Options, SegmentOffset, SegmentSignature};
+use crate::{Options, SegmentOffset, SegmentSignature};
 
 fn find<W: Write>(
     fingerprint: u64,
@@ -20,7 +19,6 @@ fn find<W: Write>(
     options: &mut Options<W>,
 ) -> Option<usize> {
     let mut i = start;
-    let offset = -1;
     let mut count = 0;
 
     let mut hash: u64 = 0;
@@ -57,13 +55,18 @@ fn find<W: Write>(
 
 // determine if the block specified by offset and size overlap with
 // addresses already in allocated_address_space
-pub fn address_space_is_used(offset: usize, size: usize, allocated_address_space: &HashMap<usize, usize>) -> bool {
+pub fn address_space_is_used(
+    offset: usize,
+    size: usize,
+    allocated_address_space: &HashMap<usize, usize>,
+) -> bool {
     let end = offset + size;
     // O(n) lookup is not ideal, but fast enough for now
     for (block_start, block_size) in allocated_address_space.iter() {
         let block_end = *block_start + block_size;
-        if (offset >= *block_start && offset < block_end) ||
-            (end > *block_start && end <= block_end) {
+        if (offset >= *block_start && offset < block_end)
+            || (end > *block_start && end <= block_end)
+        {
             return true;
         }
     }
@@ -77,7 +80,7 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
         for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
             let segment = SegmentSignature::deserialize(document).unwrap();
             // TODO: this should only be set once, and it should be checked for consistency
-            options.mipsFamily = segment.family;
+            options.mips_family = segment.family;
 
             *segment_map.entry(segment).or_insert(0) += 1;
         }
@@ -90,15 +93,15 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
         .map(|(k, v)| (k, *v))
         .collect::<Vec<(&SegmentSignature, usize)>>();
 
-    segment_counts
-        .sort_by(|(segment_a, count_a), (segment_b, count_b)|
-            count_a
-                .cmp(count_b)
-                .reverse()
-                .then(segment_a.size.cmp(&segment_b.size).reverse()));
+    segment_counts.sort_by(|(segment_a, count_a), (segment_b, count_b)| {
+        count_a
+            .cmp(count_b)
+            .reverse()
+            .then(segment_a.size.cmp(&segment_b.size).reverse())
+    });
     let sorted_segments = segment_counts
         .iter()
-        .map(|(segment, count)| *segment)
+        .map(|(segment, _)| *segment)
         .collect::<Vec<&SegmentSignature>>();
 
     let mut allocated_address_space: HashMap<usize, usize> = HashMap::new();
@@ -109,7 +112,7 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
         .map(|b| {
             // TODO: make endianness optional
             let instruction = mips::bytes_to_le_instruction(b);
-            mips::normalize_instruction(instruction, options.mipsFamily)
+            mips::normalize_instruction(instruction, options.mips_family)
         })
         .collect();
 
@@ -130,7 +133,10 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
 
         // if this address space is already occupied, ignore
         if address_space_is_used(offset, segment.size, &allocated_address_space) {
-            println!("found used address space: {} ({}) {:?}", offset, segment.size, segment);
+            // println!(
+            //     "found used address space: {} ({}) {:?}",
+            //     offset, segment.size, segment
+            // );
             continue;
         }
 
@@ -167,7 +173,7 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
             symbols: map,
         };
 
-        writeln!(options.writer, "---");
+        writeln!(options.writer, "---").expect("Write ocument separator");
         so.serialize_to_yaml(&mut options.writer);
     }
 }

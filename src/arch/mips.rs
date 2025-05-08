@@ -27,7 +27,7 @@ pub fn bytes_to_le_instruction(bytes: &[u8]) -> u32 {
         | (bytes[0] as u32)
 }
 
-enum InstrType {
+pub enum InstrType {
     InstrTypeUnknown = 0,
     InstrTypeJ = 1,
     InstrTypeI = 2,
@@ -37,7 +37,7 @@ enum InstrType {
 }
 
 impl InstrType {
-    fn from_u32(instr_type: u32) -> Self {
+    pub fn from_u32(instr_type: u32) -> Self {
         match instr_type {
             1 => InstrType::InstrTypeJ,
             2 => InstrType::InstrTypeI,
@@ -49,7 +49,7 @@ impl InstrType {
     }
 }
 
-trait ToInstrType {
+pub trait ToInstrType {
     fn instr_type(&self) -> InstrType;
 }
 
@@ -86,8 +86,7 @@ impl ToInstrType for Instruction {
 }
 
 pub fn normalize_instruction(instruction: u32, family: MIPSFamily) -> u32 {
-    // TODO: this needs to be configurable
-    let i = Instruction::new(instruction, 0, family.category());
+    let _i = Instruction::new(instruction, 0, family.category());
     // // mask any fields which may refer to global symbols. this will
     // // mask false positives, but keep most immediates and local vars.
 
@@ -97,7 +96,7 @@ pub fn normalize_instruction(instruction: u32, family: MIPSFamily) -> u32 {
     // _ => instruction & 0xFFFF0000,
     // }
 
-    let opcode = instruction >> 26;
+    // let opcode = instruction >> 26;
     // if opcode == 0 || opcode == 28 {
     //     assert!(i.instr_type()  as u32 == InstrType::InstrTypeR as u32 , "expected R o = {}, i = {}, {:?}, last = {:?}", opcode, i.instr_type() as u32,
     //     i, i.get_operands_slice())

@@ -1,11 +1,10 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
-use serde_yaml::{self};
 use std::io::Write;
 use std::path::Path;
 
 use crate::arch::mips;
-use crate::map::{read_segments, FunctionEntry, ObjectMap};
+use crate::map::{read_segments, ObjectMap};
 use crate::SerializeToYAML;
 use crate::{FunctionSignature, Options, SegmentSignature};
 
@@ -23,7 +22,7 @@ fn sig_for_range<W: Write>(bytes: &[u8], offset: usize, size: usize, options: &O
         // get instruction
         // println!("bytes: {} to {} of {}", i, i + 4, bytes.len());
         let instruction = mips::bytes_to_le_instruction(&bytes[i..(i + 4)]);
-        let masked_ins = mips::normalize_instruction(instruction, options.mipsFamily);
+        let masked_ins = mips::normalize_instruction(instruction, options.mips_family);
 
         acc = horner_hash(masked_ins, acc, options.radix, options.modulus);
     }
@@ -56,11 +55,11 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
         name: map.name().to_string(),
         fingerprint: object_hash,
         size: map.size,
-        family: options.mipsFamily,
+        family: options.mips_family,
         functions,
     };
 
-    writeln!(options.writer, "---");
+    writeln!(options.writer, "---").expect("Write ocument separator");
     sig.serialize_to_yaml(&mut options.writer);
 }
 
@@ -71,7 +70,7 @@ pub fn evaluate<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Option
 
     if let Some(family) = elf::mips_family(elf_file) {
         // println!("family: {:?}", family);
-        options.mipsFamily = family;
+        options.mips_family = family;
     }
 
     for map in segments {

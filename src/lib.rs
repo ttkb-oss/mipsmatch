@@ -1,11 +1,10 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
 use serde::{Deserialize, Serialize};
-use serde_hex::{SerHex, StrictPfx};
 use serde_with::{self, serde_as};
 use std::collections::HashMap;
-use std::io::Write;
 use std::hash::Hash;
+use std::io::Write;
 
 pub mod arch;
 pub mod cli;
@@ -42,7 +41,7 @@ pub struct Options<W: Write> {
     pub modulus: u64,
     pub radix: u64,
     pub writer: W,
-    pub mipsFamily: MIPSFamily,
+    pub mips_family: MIPSFamily,
 }
 
 impl<W: Write> Options<W> {
@@ -52,7 +51,7 @@ impl<W: Write> Options<W> {
             modulus: 0xFFFFFFEF,
             radix: 4294967296,
             writer,
-            mipsFamily: MIPSFamily::R3000GTE,
+            mips_family: MIPSFamily::R3000GTE,
         }
     }
 }
@@ -70,7 +69,7 @@ pub trait SerializeToYAML {
 
 #[serde_as]
 #[derive(Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-struct FunctionSignature {
+pub struct FunctionSignature {
     pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
     pub fingerprint: u64,
@@ -96,16 +95,19 @@ impl SerializeToYAML for SegmentSignature {
             "{}name: {}",
             indent,
             serde_yaml::to_string(&self.name).unwrap().trim()
-        );
-        writeln!(writer, "{}fingerprint: 0x{:X}", indent, self.fingerprint);
-        writeln!(writer, "{}size: 0x{:X}", indent, self.size);
+        )
+        .expect("segment name serialization");
+        writeln!(writer, "{}fingerprint: 0x{:X}", indent, self.fingerprint)
+            .expect("segment fingerprint serialization");
+        writeln!(writer, "{}size: 0x{:X}", indent, self.size).expect("segment size serialization");
         writeln!(
             writer,
             "{}family: {}",
             indent,
             serde_yaml::to_string(&self.family).unwrap().trim()
-        );
-        writeln!(writer, "{}functions:", indent);
+        )
+        .expect("segment family serialization");
+        writeln!(writer, "{}functions:", indent).expect("segment functions key serialization");
 
         for function in self.functions.iter() {
             writeln!(
@@ -113,20 +115,23 @@ impl SerializeToYAML for SegmentSignature {
                 "{}- name: {}",
                 indent,
                 serde_yaml::to_string(&function.name).unwrap().trim()
-            );
+            )
+            .expect("function name serialization");
             writeln!(
                 writer,
                 "{}  fingerprint: 0x{:X}",
                 indent, function.fingerprint
-            );
-            writeln!(writer, "{}  size: 0x{:X}", indent, function.size);
+            )
+            .expect("function fingerprint serialization");
+            writeln!(writer, "{}  size: 0x{:X}", indent, function.size)
+                .expect("function size serialization");
         }
     }
 }
 
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct SegmentOffset {
+pub struct SegmentOffset {
     pub name: String,
     pub offset: usize,
     pub size: usize,
@@ -141,10 +146,12 @@ impl SerializeToYAML for SegmentOffset {
             "{}name: {}",
             indent,
             serde_yaml::to_string(&self.name).unwrap().trim()
-        );
-        writeln!(writer, "{}offset: 0x{:X}", indent, self.offset);
-        writeln!(writer, "{}size: 0x{:X}", indent, self.size);
-        writeln!(writer, "{}symbols:", indent);
+        )
+        .expect("segment name serialization");
+        writeln!(writer, "{}offset: 0x{:X}", indent, self.offset)
+            .expect("segment offset serialization");
+        writeln!(writer, "{}size: 0x{:X}", indent, self.size).expect("segment size serialization");
+        writeln!(writer, "{}symbols:", indent).expect("segment symbols key serialization");
 
         for (symbol, offset) in self.symbols.iter() {
             writeln!(
@@ -153,7 +160,8 @@ impl SerializeToYAML for SegmentOffset {
                 indent,
                 serde_yaml::to_string(&symbol).unwrap().trim(),
                 offset
-            );
+            )
+            .expect("segment symbol serialization");
         }
     }
 }
