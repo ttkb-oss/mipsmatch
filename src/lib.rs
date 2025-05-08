@@ -5,6 +5,7 @@ use serde_hex::{SerHex, StrictPfx};
 use serde_with::{self, serde_as};
 use std::collections::HashMap;
 use std::io::Write;
+use std::hash::Hash;
 
 pub mod arch;
 pub mod cli;
@@ -31,7 +32,7 @@ struct Args {
 }
 */
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum MIPSFamily {
     R3000GTE,
     R4000Allegrex,
@@ -68,7 +69,7 @@ pub trait SerializeToYAML {
 }
 
 #[serde_as]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 struct FunctionSignature {
     pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
@@ -77,7 +78,7 @@ struct FunctionSignature {
 }
 
 #[serde_as]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct SegmentSignature {
     pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]

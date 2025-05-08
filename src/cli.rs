@@ -36,8 +36,8 @@ enum CLICommand {
         #[clap(short, long, value_enum, default_value_t = Granularity::All)]
         granularity: Granularity,
 
-        match_config: PathBuf,
-        bin: Vec<PathBuf>,
+        match_config: Vec<PathBuf>,
+        bin: PathBuf,
     },
     /// Test target for ELF files
     Elf { elf: PathBuf },
@@ -85,7 +85,7 @@ pub fn main() {
             match_config,
             bin,
         } => {
-            scan(&match_config, bin, &mut options);
+            scan(&match_config, &bin, &mut options);
         }
         CLICommand::Elf { elf } => {
             inspect_elf(&elf, &mut options);

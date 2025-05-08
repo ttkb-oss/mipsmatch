@@ -55,22 +55,55 @@ fn find<W: Write>(
     }
 }
 
-pub fn scan<W: Write>(match_file: &Path, bin_files: Vec<PathBuf>, options: &mut Options<W>) {
-    for bin_file in bin_files.iter() {
-        scan_one(match_file, &bin_file, options)
+// determine if the block specified by offset and size overlap with
+// addresses already in allocated_address_space
+pub fn address_space_is_used(offset: usize, size: usize, allocated_address_space: &HashMap<usize, usize>) -> bool {
+    let end = offset + size;
+    // O(n) lookup is not ideal, but fast enough for now
+    for (block_start, block_size) in allocated_address_space.iter() {
+        let block_end = *block_start + block_size;
+        if (offset >= *block_start && offset < block_end) ||
+            (end > *block_start && end <= block_end) {
+            return true;
+        }
     }
+    return false;
 }
 
-pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Options<W>) {
-    let bytes = std::fs::read(bin_file).expect("Could not read bin file");
+pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &mut Options<W>) {
+    let mut segment_map: HashMap<SegmentSignature, usize> = HashMap::new();
+    for match_file in match_files {
+        let f = std::fs::File::open(match_file).unwrap();
+        for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
+            let segment = SegmentSignature::deserialize(document).unwrap();
+            // TODO: this should only be set once, and it should be checked for consistency
+            options.mipsFamily = segment.family;
 
-    let f = std::fs::File::open(match_file).unwrap();
-    for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
-        let segment = SegmentSignature::deserialize(document).unwrap();
-        options.mipsFamily = segment.family;
-        break;
+            *segment_map.entry(segment).or_insert(0) += 1;
+        }
     }
 
+    // prefer segments that are found the most followed by
+    // segments with the largest size
+    let mut segment_counts = segment_map
+        .iter()
+        .map(|(k, v)| (k, *v))
+        .collect::<Vec<(&SegmentSignature, usize)>>();
+
+    segment_counts
+        .sort_by(|(segment_a, count_a), (segment_b, count_b)|
+            count_a
+                .cmp(count_b)
+                .reverse()
+                .then(segment_a.size.cmp(&segment_b.size).reverse()));
+    let sorted_segments = segment_counts
+        .iter()
+        .map(|(segment, count)| *segment)
+        .collect::<Vec<&SegmentSignature>>();
+
+    let mut allocated_address_space: HashMap<usize, usize> = HashMap::new();
+
+    let bytes = std::fs::read(bin_file).expect("Could not read bin file");
     let instructions: Vec<u32> = bytes
         .chunks(4)
         .map(|b| {
@@ -80,10 +113,7 @@ pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Opti
         })
         .collect();
 
-    let f = std::fs::File::open(match_file).unwrap();
-    for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
-        let segment = SegmentSignature::deserialize(document).unwrap();
-
+    for segment in sorted_segments {
         // try to find the entire object, first
         let offset = find(
             segment.fingerprint,
@@ -98,12 +128,20 @@ pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Opti
             continue;
         };
 
+        // if this address space is already occupied, ignore
+        if address_space_is_used(offset, segment.size, &allocated_address_space) {
+            println!("found used address space: {} ({}) {:?}", offset, segment.size, segment);
+            continue;
+        }
+
+        allocated_address_space.insert(offset, segment.size);
+
         let mut map = HashMap::new();
 
         let mut position = offset;
         let function_len = segment.functions.len();
 
-        for function in segment.functions {
+        for function in segment.functions.iter() {
             let function_offset = find(
                 function.fingerprint,
                 function.size / 4,
@@ -114,7 +152,7 @@ pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Opti
             );
             if let Some(function_offset) = function_offset {
                 position = function_offset + function.size;
-                map.insert(function.name, function_offset);
+                map.insert(function.name.clone(), function_offset);
             }
         }
 
@@ -123,7 +161,7 @@ pub fn scan_one<W: Write>(match_file: &Path, bin_file: &Path, options: &mut Opti
         }
 
         let so = SegmentOffset {
-            name: segment.name,
+            name: segment.name.clone(),
             offset,
             size: segment.size,
             symbols: map,
