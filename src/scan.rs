@@ -73,8 +73,20 @@ pub fn address_space_is_used(
     return false;
 }
 
+fn best_name(names: &Vec<String>) -> Option<String> {
+    let mut pop: HashMap<String, usize> = HashMap::new();
+    for name in names {
+        *pop.entry(name.clone()).or_insert(0) += 1;
+    }
+    if let Some((name, _)) = pop.iter().max_by_key(|&(_, count)| count) {
+        return Some(name).cloned();
+    }
+    names.first().cloned()
+}
+
 pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &mut Options<W>) {
     let mut segment_map: HashMap<SegmentSignature, usize> = HashMap::new();
+    let mut name_map: HashMap<u64, Vec<String>> = HashMap::new();
     for match_file in match_files {
         let f = std::fs::File::open(match_file).unwrap();
         for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
@@ -82,6 +94,8 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
             // TODO: this should only be set once, and it should be checked for consistency
             options.mips_family = segment.family;
 
+            let entry = name_map.entry(segment.fingerprint).or_insert(Vec::new());
+            entry.push(segment.name.clone());
             *segment_map.entry(segment).or_insert(0) += 1;
         }
     }
@@ -94,15 +108,18 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
         .collect::<Vec<(&SegmentSignature, usize)>>();
 
     segment_counts.sort_by(|(segment_a, count_a), (segment_b, count_b)| {
-        count_a
-            .cmp(count_b)
+        segment_a
+            .size
+            .cmp(&segment_b.size)
             .reverse()
-            .then(segment_a.size.cmp(&segment_b.size).reverse())
+            .then(count_a.cmp(count_b).reverse())
     });
     let sorted_segments = segment_counts
         .iter()
         .map(|(segment, _)| *segment)
         .collect::<Vec<&SegmentSignature>>();
+
+    // use the most popular name for each segment
 
     let mut allocated_address_space: HashMap<usize, usize> = HashMap::new();
 
@@ -166,8 +183,11 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
             continue;
         }
 
+        let empty_vec = &Vec::<String>::new();
+        let names = name_map.get(&segment.fingerprint).unwrap_or(&empty_vec);
+
         let so = SegmentOffset {
-            name: segment.name.clone(),
+            name: best_name(names).unwrap_or(segment.name.clone()),
             offset,
             size: segment.size,
             symbols: map,

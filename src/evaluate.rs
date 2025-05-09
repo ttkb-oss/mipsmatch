@@ -35,12 +35,12 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
     // println!("\toffset: {}\n\tsize: {}\n\tlen: {}", map.offset, map.size, bytes.len());
     // calculate the fingerprint of the entire object
     // println!("map: {} of {}", map.offset, map.size);
-    let object_hash = sig_for_range(bytes, map.offset, map.size, options);
+    let object_hash = sig_for_range(bytes, map.offset - map.vrom, map.size, options);
 
     let mut functions = Vec::new();
 
     for symbol in map.text_symbols.iter() {
-        let segment_hash = sig_for_range(bytes, symbol.offset, symbol.size, options);
+        let segment_hash = sig_for_range(bytes, symbol.offset - map.vrom, symbol.size, options);
 
         // println!("getting sig for {} at 0x{:x}: {:x}", symbol.name, symbol.offset, symbol.size);
 
