@@ -30,15 +30,18 @@ enum CLICommand {
         /// An overlay elf file
         elf: PathBuf,
     },
+
     /// Use a match file to find offsets in a new overlay
     Scan {
         /// The level match granularity should occur (segment, function)
         #[clap(short, long, value_enum, default_value_t = Granularity::All)]
         granularity: Granularity,
 
+        #[arg(required=true, num_args=1..)]
         match_config: Vec<PathBuf>,
         bin: PathBuf,
     },
+
     /// Test target for ELF files
     Elf { elf: PathBuf },
 }
