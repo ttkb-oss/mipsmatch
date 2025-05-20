@@ -5,7 +5,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  macos-test:
+  cargo-test:
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Test
