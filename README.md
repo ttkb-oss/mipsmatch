@@ -23,7 +23,7 @@ also help determine which SDK a game was compiled against, among other things.
 the functions in that segment. The second stage uses that match file to find matches in another BIN file. This can be a
 file that does not have `map` or `elf` files.
 
-Match fingerprints are currently unstable and only gauranteed to match with the version of `mipsmatch` that generated
+Match fingerprints are currently unstable and only guaranteed to match with the version of `mipsmatch` that generated
 them.
 
 `mipsmatch` was inspired by the `dups` tool written for [`sotn-decomp`](https://github.com/xeeynamo/sotn-decomp). Unlike
@@ -128,6 +128,6 @@ binary blobs without other configuration.
 
 `mipsmatch` leverages several libraries used by your favorite decompilation tools:
 
-* [mapfile\_parser](https://github.com/Decompollaborate/mapfile_parser) for parsing… map files (what else?)
+* [mapfile_parser](https://github.com/Decompollaborate/mapfile_parser) for parsing… map files (what else?)
 * [rust-elf](https://github.com/cole14/rust-elf) for parsing… ELF files (what else?)
 * [rabbitizer](https://github.com/Decompollaborate/rabbitizer) for decoding MIPS instructions

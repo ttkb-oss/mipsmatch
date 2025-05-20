@@ -1,0 +1,17 @@
+Horner's
+SDK
+SDKs
+SotN
+YAML
+config
+config
+decompilation
+decompile
+decompiled
+decompiling
+lld
+mapfile_parser
+mipsmatch
+rabbitizer
+radix
+versioned

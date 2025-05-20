@@ -10,7 +10,7 @@ use crate::fingerprint::fingerprint;
 use crate::scan::scan;
 use crate::Options;
 
-/// Finds common sectoins of code and provides offsets for well known code segments.
+/// Finds common sections of code and provides offsets for well known code segments.
 #[derive(Debug, Parser)]
 #[clap(name = env!("CARGO_CRATE_NAME"), version)]
 pub struct App {
@@ -23,7 +23,7 @@ pub struct App {
 
 #[derive(Debug, Subcommand)]
 enum CLICommand {
-    /// Create a match file from an existing overlay
+    /// Create a fingerprint file from existing map and elf files
     Fingerprint {
         /// A GNU Map file
         map: PathBuf,
@@ -31,7 +31,7 @@ enum CLICommand {
         elf: PathBuf,
     },
 
-    /// Use a match file to find offsets in a new overlay
+    /// Use a fingerprint file to find offsets in a new overlay
     Scan {
         /// The level match granularity should occur (segment, function)
         #[clap(short, long, value_enum, default_value_t = Granularity::All)]
