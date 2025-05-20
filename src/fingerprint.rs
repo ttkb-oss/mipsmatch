@@ -63,7 +63,7 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
     sig.serialize_to_yaml(&mut options.writer);
 }
 
-pub fn evaluate<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Options<W>) {
+pub fn fingerprint<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Options<W>) {
     let elf_symbols = elf::function_symbols(elf_file);
     let segments = read_segments(map_file, elf_symbols);
     let bin_data = elf::bin_data(elf_file);

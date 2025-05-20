@@ -6,7 +6,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 use crate::elf::inspect_elf;
-use crate::evaluate::evaluate;
+use crate::fingerprint::fingerprint;
 use crate::scan::scan;
 use crate::Options;
 
@@ -24,7 +24,7 @@ pub struct App {
 #[derive(Debug, Subcommand)]
 enum CLICommand {
     /// Create a match file from an existing overlay
-    Evaluate {
+    Fingerprint {
         /// A GNU Map file
         map: PathBuf,
         /// An overlay elf file
@@ -80,8 +80,8 @@ pub fn main() {
     });
 
     match args.command {
-        CLICommand::Evaluate { map, elf } => {
-            evaluate(&map, &elf, &mut options);
+        CLICommand::Fingerprint { map, elf } => {
+            fingerprint(&map, &elf, &mut options);
         }
         CLICommand::Scan {
             granularity: _,

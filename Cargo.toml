@@ -21,7 +21,7 @@ maintainer = "Jonathan Hohle <jon@ttkb.co>"
 copyright = "2025, TTKB, LLC."
 license-file = ["LICENSE.TXT", "2"]
 extended-description = """\
-A utility for finding duplicates when decompiling several overlays
+A utility for searching MIPS binaries for known functions, data, and segments.
 """
 depends = "$auto"
 section = "development"

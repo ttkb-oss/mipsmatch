@@ -1,0 +1,15 @@
+name: Test
+
+on: [push]
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  macos-test:
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: cargo test --all-features
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]

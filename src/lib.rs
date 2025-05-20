@@ -9,7 +9,7 @@ use std::io::Write;
 pub mod arch;
 pub mod cli;
 pub mod elf;
-pub mod evaluate;
+pub mod fingerprint;
 pub mod map;
 pub mod scan;
 
@@ -24,7 +24,7 @@ Finds common sections of code and provides offsets for well known code segments.
 
 Usage:
 
-    sotn-match evaluate [map] [bin] ...
+    sotn-match fingerprint [map] [bin] ...
     sotn-match match [match-file] [bin] ...
 ")]
 struct Args {

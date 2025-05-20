@@ -1,7 +1,13 @@
 # mipsmatch
 
-`mipsmatch` is a tool for calculating fingerprints for overlay segments and functions and using those fingerprints to
-find identical code in other overlay files. This utility relies on GNU map and elf files created by `ld` at link time.\*
+`mipsmatch` is a utility for searching MIPS binaries for known functions, data, and segments. It calculates fingerprints
+for overlay segments and functions and using those fingerprints to find identical code in other binary files. It's like
+[`grep(1)`](https://man.freebsd.org/cgi/man.cgi?grep(1)) for MIPS.
+
+Unlike grep, it's not easy to specify binary MIPS instructions at the command line to search for. `mipsmatch` lets you
+fingerprint functions that are known and use those fingerprints to find the same function in other files.
+
+This utility relies on GNU map and elf files created by `ld` at link time.\*
 
 When decompiling a program, especially games and other software written for specific hardware (consoles) using very
 specific compilers (SDKs) it is common for several files, or overlays to contain identical code. For example, multiple
@@ -24,18 +30,18 @@ them.
 `dups`, `mipsmatch` finds identical segments. The major advantage is that fingerprints can be versioned, curated, and
 distributed and finding matching fingerprints is a significantly cheaper operation than determining similarity.
 
-## mipsmatch evaluate
+## mipsmatch fingerprint
 
-`evaluate` is used to calculate segment and function fingerprints for all text symbols. It takes a map file in GNU map
+`fingerprint` is used to calculate segment and function fingerprints for all text symbols. It takes a map file in GNU map
 format (lld or gold formats may or may not work) along with the target binary overlay that map was used to build. That
 file can be either a compiled file or one from a game disk.
 
-`evaluate` will create a YAML document which can then be used by `scan` to find matching segments in another bin file.
+`fingerprint` will create a YAML document which can then be used by `scan` to find matching segments in another bin file.
 
 Example:
 
 ```
-mipsmatch --output build/us/match.cen.yaml evaluate build/us/stcen.map build/us/stcen.elf
+mipsmatch --output build/us/match.cen.yaml fingerprint build/us/stcen.map build/us/stcen.elf
 ```
 
 ## mipsmatch scan
@@ -103,3 +109,25 @@ find all function symbols. The elf file also contains the binary image which is 
 
 Fingerprints are created using Horner's Method. A radix and modulus have been chosen to optimize entropy for a 32-bit
 fingerprint. Rabin-Karp is used to find these fingerprints in other files.
+
+## What About…
+
+### `coddog`
+
+[`coddog`](https://github.com/ethteck/coddog) is another tool with similar behavior, but a few notable differences:
+
+* it currently uses fuzzy matching and edit distance to determine equivalent functions.
+* it's designed to find similar functions in one binary and while it can find functions across several binaries (like is
+  common on disk-based systems), requires relatively heavy weight config for each bin to compare.
+
+`mipsmatch` matches functions with identical operations and _most_ operands. It only masks out operands that could
+contain global references. It uses previously built map and elf files to find equivalent functions and segments in
+binary blobs without other configuration.
+
+## Built on the Shoulders of Giants
+
+`mipsmatch` leverages several libraries used by your favorite decompilation tools:
+
+* [mapfile\_parser](https://github.com/Decompollaborate/mapfile_parser) for parsing… map files (what else?)
+* [rust-elf](https://github.com/cole14/rust-elf) for parsing… ELF files (what else?)
+* [rabbitizer](https://github.com/Decompollaborate/rabbitizer) for decoding MIPS instructions
