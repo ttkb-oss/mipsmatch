@@ -20,11 +20,16 @@ impl MIPSCategory for MIPSFamily {
     }
 }
 
-pub fn bytes_to_le_instruction(bytes: &[u8]) -> u32 {
+pub fn bytes_to_le_u32le(bytes: &[u8]) -> u32 {
     ((bytes[3] as u32) << 24)
         | ((bytes[2] as u32) << 16)
         | ((bytes[1] as u32) << 8)
         | (bytes[0] as u32)
+}
+
+
+pub fn bytes_to_le_instruction(bytes: &[u8]) -> u32 {
+    bytes_to_le_u32le(bytes)
 }
 
 pub enum InstrType {

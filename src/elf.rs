@@ -80,11 +80,18 @@ pub fn bin_data(elf_path: &Path) -> Vec<u8> {
     // Parse the shdrs and collect them into a map keyed on their zero-copied name
     let program_section_header: SectionHeader = shdrs
         .iter()
+        .filter(|shdr| shdr.sh_type == elf::abi::SHT_PROGBITS)
+        .filter(|shdr| (shdr.sh_flags as u32 & elf::abi::SHF_EXECINSTR) == elf::abi::SHF_EXECINSTR)
         .filter(|shdr| {
+            // n.b.! this check is probably redundant, but headers from GCC
+            //       and MetroWorks are marked as `PROGBITS`, but don't
+            //       have an executable flag. In case they somehow make it
+            //       through, exclude them as well.
             let section_name = strtab.get(shdr.sh_name as usize).unwrap();
-            section_name != ".mwo_header"
+            section_name != ".mwo_header" &&
+                section_name != ".header"
         })
-        .find(|shdr| shdr.sh_type == elf::abi::SHT_PROGBITS)
+        .next()
         .expect("Expected one PROGBITS section");
 
     // we have the right data
