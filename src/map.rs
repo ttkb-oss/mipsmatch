@@ -60,7 +60,11 @@ fn symbols_to_segment_symbols(
 // Params:
 //   - map_file: path
 //   - section_type: type name like ".text", ".rodata", etc.
-pub fn read_segments(map_file: &Path, section_type: &str, function_symbols: Vec<FunctionEntry>) -> Vec<ObjectMap> {
+pub fn read_segments(
+    map_file: &Path,
+    section_type: &str,
+    function_symbols: Vec<FunctionEntry>,
+) -> Vec<ObjectMap> {
     MapFile::new_from_map_file(map_file)
         .filter_by_section_type(section_type)
         .segments_list

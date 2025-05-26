@@ -27,7 +27,6 @@ pub fn bytes_to_le_u32le(bytes: &[u8]) -> u32 {
         | (bytes[0] as u32)
 }
 
-
 pub fn bytes_to_le_instruction(bytes: &[u8]) -> u32 {
     bytes_to_le_u32le(bytes)
 }
