@@ -11,6 +11,8 @@ use std::path::Path;
 use crate::MIPSFamily;
 use crate::Options;
 
+const EF_MIPS_MACH_5900: u32 =  0x00920000;
+
 pub fn mips_family(elf_path: &Path) -> Option<MIPSFamily> {
     let file_data = std::fs::read(elf_path).expect("Could not read file.");
     let slice = file_data.as_slice();
@@ -20,10 +22,15 @@ pub fn mips_family(elf_path: &Path) -> Option<MIPSFamily> {
     let flags = header.e_flags;
 
     if header.e_machine == elf::abi::EM_MIPS {
-        if (flags & elf::abi::EF_MIPS_ARCH) == elf::abi::EF_MIPS_ARCH_1 {
-            return Some(MIPSFamily::R3000GTE);
-        } else if (flags & elf::abi::EF_MIPS_ARCH) == elf::abi::EF_MIPS_ARCH_2 {
-            return Some(MIPSFamily::R4000Allegrex);
+        match flags & elf::abi::EF_MIPS_ARCH {
+        elf::abi::EF_MIPS_ARCH_1 => return Some(MIPSFamily::R3000GTE),
+        elf::abi::EF_MIPS_ARCH_2 => return Some(MIPSFamily::R4000Allegrex),
+        elf::abi::EF_MIPS_ARCH_3 => return Some(MIPSFamily::R4000),
+        _ => (),
+        }
+
+        if (flags & elf::abi::EF_MIPS_MACH) == EF_MIPS_MACH_5900 {
+            return Some(MIPSFamily::R5900);
         }
     }
 

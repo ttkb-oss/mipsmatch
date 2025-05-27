@@ -33,8 +33,10 @@ struct Args {
 
 #[derive(Copy, Clone, Eq, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum MIPSFamily {
-    R3000GTE,
-    R4000Allegrex,
+    R3000GTE,      // PS1
+    R4000,         // N64
+    R4000Allegrex, // PSP
+    R5900,         // PS2
 }
 
 pub struct Options<W: Write> {

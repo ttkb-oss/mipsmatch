@@ -15,7 +15,9 @@ impl MIPSCategory for MIPSFamily {
     fn category(&self) -> InstrCategory {
         match self {
             MIPSFamily::R3000GTE => InstrCategory::R3000GTE,
+            MIPSFamily::R4000 => InstrCategory::CPU,
             MIPSFamily::R4000Allegrex => InstrCategory::R4000ALLEGREX,
+            MIPSFamily::R5900 => InstrCategory::R5900,
         }
     }
 }
