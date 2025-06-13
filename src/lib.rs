@@ -80,12 +80,30 @@ pub struct FunctionSignature {
 
 #[serde_as]
 #[derive(Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub enum RODataSignatureType {
+    OnlyJumpTables,
+    StartsAndEndsWithJumpTable,
+    StartsWithJumpTable,
+    EndsWithJumpTable,
+    Unknown,
+}
+
+#[serde_as]
+#[derive(Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub struct RODataSignature {
+    rodataType: RODataSignatureType,
+    size: usize,
+}
+
+#[serde_as]
+#[derive(Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct SegmentSignature {
     pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
     pub fingerprint: u64,
     pub size: usize,
     pub family: MIPSFamily,
+    pub rodata: Option<RODataSignature>,
     pub functions: Vec<FunctionSignature>,
 }
 
@@ -109,6 +127,18 @@ impl SerializeToYAML for SegmentSignature {
             serde_yaml::to_string(&self.family).unwrap().trim()
         )
         .expect("segment family serialization");
+        if let Some(ref rodata) = self.rodata {
+            writeln!(writer, "{}rodata:", indent).expect("segment functions key serialization");
+            writeln!(
+                writer,
+                "{}  rodataType: {}",
+                indent,
+                serde_yaml::to_string(&rodata.rodataType).unwrap().trim()
+            )
+            .expect("segment rodataType serialization");
+            writeln!(writer, "{}  size: 0x{:X}", indent, rodata.size)
+                .expect("segment rodata.size serialization");
+        }
         writeln!(writer, "{}functions:", indent).expect("segment functions key serialization");
 
         for function in self.functions.iter() {
@@ -133,10 +163,26 @@ impl SerializeToYAML for SegmentSignature {
 
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct RODataOffset {
+    pub offset: usize,
+    pub size: usize,
+}
+
+#[serde_as]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct FunctionOffset {
+    pub name: String,
+    pub offset: usize,
+    pub size: usize,
+}
+
+#[serde_as]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct SegmentOffset {
     pub name: String,
     pub offset: usize,
     pub size: usize,
+    pub rodata: Option<RODataOffset>,
     pub symbols: HashMap<String, usize>,
 }
 
@@ -153,9 +199,21 @@ impl SerializeToYAML for SegmentOffset {
         writeln!(writer, "{}offset: 0x{:X}", indent, self.offset)
             .expect("segment offset serialization");
         writeln!(writer, "{}size: 0x{:X}", indent, self.size).expect("segment size serialization");
+
+        if let Some(ref rodata) = self.rodata {
+            writeln!(writer, "{}rodata:", indent).expect("segment rodata key serialization");
+            writeln!(writer, "{}  offset: 0x{:X}", indent, rodata.offset)
+                .expect("segment size serialization");
+            writeln!(writer, "{}  size: 0x{:X}", indent, rodata.size)
+                .expect("segment size serialization");
+        }
+
         writeln!(writer, "{}symbols:", indent).expect("segment symbols key serialization");
 
-        for (symbol, offset) in self.symbols.iter() {
+        let mut sorted_symbols: Vec<(&String, &usize)> = self.symbols.iter().collect();
+        sorted_symbols.sort_by(|(_, a), (_, b)| a.cmp(b));
+
+        for (symbol, offset) in sorted_symbols.iter() {
             writeln!(
                 writer,
                 "{}  {}: 0x{:X}",

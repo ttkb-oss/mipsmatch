@@ -8,7 +8,10 @@ use std::path::PathBuf;
 
 use crate::arch::mips;
 use crate::SerializeToYAML;
-use crate::{Options, SegmentOffset, SegmentSignature};
+use crate::{
+    MIPSFamily, Options, RODataOffset, RODataSignature, RODataSignatureType, SegmentOffset,
+    SegmentSignature,
+};
 
 fn find<W: Write>(
     fingerprint: u64,
@@ -73,6 +76,132 @@ pub fn address_space_is_used(
     return false;
 }
 
+fn find_only_jump_tables(
+    segment_start: usize,
+    segment_end: usize,
+    vrom_start: usize,
+    vrom_end: usize,
+    rodata_size: usize,
+    mips_family: MIPSFamily,
+    bytes: &[u8],
+) -> Option<RODataOffset> {
+    let mut found_segment_addr = false;
+    let mut last_found_jtable_addr = 0;
+    let mut range_start = 0;
+
+    for i in (0..bytes.len()).step_by(4) {
+        if i >= vrom_start && i < vrom_end {
+            continue;
+        }
+
+        let addr = mips::read_word(&bytes[i..(i + 4)], mips_family) as usize;
+
+        if addr > segment_start && addr < segment_end {
+            if !found_segment_addr {
+                found_segment_addr = true;
+                range_start = i;
+            }
+        } else if found_segment_addr {
+            found_segment_addr = false;
+            if (i - range_start) == rodata_size {
+                // println!("found rodata segment at 0x{:X}", range_start);
+                return Some(RODataOffset {
+                    offset: range_start,
+                    size: rodata_size,
+                });
+            }
+        }
+    }
+
+    None
+}
+
+fn find_ends_with_jump_table(
+    segment_start: usize,
+    segment_end: usize,
+    vrom_start: usize,
+    vrom_end: usize,
+    rodata_size: usize,
+    mips_family: MIPSFamily,
+    bytes: &[u8],
+) -> Option<RODataOffset> {
+    let mut found_segment_addr = false;
+    let mut last_found_jtable_addr = 0;
+    let mut last_offset = 0;
+
+    for i in (0..bytes.len()).step_by(4) {
+        if i >= vrom_start && i < vrom_end {
+            continue;
+        }
+
+        let addr = mips::read_word(&bytes[i..(i + 4)], mips_family) as usize;
+
+        if addr > segment_start && addr < segment_end {
+            // println!("found rodata offset: 0x{:X} -> 0x{:X}", i, addr);
+            found_segment_addr = true;
+            last_found_jtable_addr = addr;
+            last_offset = i;
+        }
+    }
+
+    let rodata_offset = last_offset - rodata_size + 4;
+
+    if found_segment_addr && rodata_offset > 0 && rodata_offset < bytes.len() {
+        Some(RODataOffset {
+            offset: rodata_offset,
+            size: rodata_size,
+        })
+    } else {
+        None
+    }
+}
+
+// TODO: need size of each function as well
+fn find_rodata(
+    rodata: &Option<RODataSignature>,
+    vram_start: &Option<usize>,
+    segment_offset: usize,
+    segment_size: usize,
+    mips_family: MIPSFamily,
+    functions: &HashMap<String, usize>,
+    bytes: &[u8],
+) -> Option<RODataOffset> {
+    let Some(ref rodata) = rodata else {
+        return None;
+    };
+
+    let Some(vram_start) = vram_start else {
+        return None;
+    };
+
+    let segment_start = vram_start + segment_offset;
+    let segment_end = segment_start + segment_size;
+
+    // println!("looking for rodata in 0x{:X} to 0x{:X}", segment_start, segment_end);
+
+    match rodata.rodataType {
+        RODataSignatureType::OnlyJumpTables => find_only_jump_tables(
+            segment_start,
+            segment_end,
+            segment_offset,
+            segment_offset + segment_size,
+            rodata.size,
+            mips_family,
+            bytes,
+        ),
+        RODataSignatureType::EndsWithJumpTable => find_ends_with_jump_table(
+            segment_start,
+            segment_end,
+            segment_offset,
+            segment_offset + segment_size,
+            rodata.size,
+            mips_family,
+            bytes,
+        ),
+        _ => None,
+    }
+}
+
 fn best_name(names: &Vec<String>) -> Option<String> {
     let mut pop: HashMap<String, usize> = HashMap::new();
     for name in names {
@@ -84,7 +213,12 @@ fn best_name(names: &Vec<String>) -> Option<String> {
     names.first().cloned()
 }
 
-pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &mut Options<W>) {
+pub fn scan<W: Write>(
+    match_files: &Vec<PathBuf>,
+    bin_file: &PathBuf,
+    vram_start: Option<usize>,
+    options: &mut Options<W>,
+) {
     let mut segment_map: HashMap<SegmentSignature, usize> = HashMap::new();
     let mut name_map: HashMap<u64, Vec<String>> = HashMap::new();
     for match_file in match_files {
@@ -126,11 +260,7 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
     let bytes = std::fs::read(bin_file).expect("Could not read bin file");
     let instructions: Vec<u32> = bytes
         .chunks(4)
-        .map(|b| {
-            // TODO: make endianness optional
-            let instruction = mips::bytes_to_le_instruction(b);
-            mips::normalize_instruction(instruction, options.mips_family)
-        })
+        .map(|b| mips::bytes_to_normalized_instruction(b, options.mips_family))
         .collect();
 
     for segment in sorted_segments {
@@ -186,10 +316,21 @@ pub fn scan<W: Write>(match_files: &Vec<PathBuf>, bin_file: &PathBuf, options: &
         let empty_vec = &Vec::<String>::new();
         let names = name_map.get(&segment.fingerprint).unwrap_or(&empty_vec);
 
+        let rodata_match = find_rodata(
+            &segment.rodata,
+            &vram_start,
+            offset,
+            segment.size,
+            options.mips_family,
+            &map,
+            &bytes,
+        );
+
         let so = SegmentOffset {
             name: best_name(names).unwrap_or(segment.name.clone()),
             offset,
             size: segment.size,
+            rodata: rodata_match,
             symbols: map,
         };
 

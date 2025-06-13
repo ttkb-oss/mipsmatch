@@ -22,15 +22,26 @@ impl MIPSCategory for MIPSFamily {
     }
 }
 
-pub fn bytes_to_le_u32le(bytes: &[u8]) -> u32 {
+pub fn le_bytes_to_u32(bytes: &[u8]) -> u32 {
     ((bytes[3] as u32) << 24)
         | ((bytes[2] as u32) << 16)
         | ((bytes[1] as u32) << 8)
         | (bytes[0] as u32)
 }
 
+pub fn be_bytes_to_u32(bytes: &[u8]) -> u32 {
+    ((bytes[0] as u32) << 24)
+        | ((bytes[1] as u32) << 16)
+        | ((bytes[2] as u32) << 8)
+        | (bytes[3] as u32)
+}
+
 pub fn bytes_to_le_instruction(bytes: &[u8]) -> u32 {
-    bytes_to_le_u32le(bytes)
+    le_bytes_to_u32(bytes)
+}
+
+pub fn bytes_to_be_instruction(bytes: &[u8]) -> u32 {
+    be_bytes_to_u32(bytes)
 }
 
 pub enum InstrType {
@@ -88,6 +99,23 @@ impl ToInstrType for Instruction {
         }
 
         InstrType::InstrTypeR
+    }
+}
+
+pub fn bytes_to_normalized_instruction(bytes: &[u8], family: MIPSFamily) -> u32 {
+    let instruction = if family == MIPSFamily::R4000 {
+        bytes_to_be_instruction(bytes)
+    } else {
+        bytes_to_le_instruction(bytes)
+    };
+    normalize_instruction(instruction, family)
+}
+
+pub fn read_word(bytes: &[u8], family: MIPSFamily) -> u32 {
+    if family == MIPSFamily::R4000 {
+        be_bytes_to_u32(bytes)
+    } else {
+        le_bytes_to_u32(bytes)
     }
 }
 

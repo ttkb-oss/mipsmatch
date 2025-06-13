@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap_num::maybe_hex;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -36,6 +37,11 @@ enum CLICommand {
         /// The level match granularity should occur (segment, function)
         #[clap(short, long, value_enum, default_value_t = Granularity::All)]
         granularity: Granularity,
+
+        /// The location the inspected binary would be loaded in VRAM. Required for
+        /// searching for DATA and RODATA segements
+        #[clap(short, long="vram-start", value_parser=maybe_hex::<usize>)]
+        vram_start: Option<usize>,
 
         #[arg(required=true, num_args=1..)]
         match_config: Vec<PathBuf>,
@@ -85,10 +91,11 @@ pub fn main() {
         }
         CLICommand::Scan {
             granularity: _,
+            vram_start,
             match_config,
             bin,
         } => {
-            scan(&match_config, &bin, &mut options);
+            scan(&match_config, &bin, vram_start, &mut options);
         }
         CLICommand::Elf { elf } => {
             inspect_elf(&elf, &mut options);

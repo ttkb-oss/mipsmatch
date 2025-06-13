@@ -5,14 +5,17 @@ use elf::endian::AnyEndian;
 use elf::section::SectionHeader;
 use elf::ElfBytes;
 use elf::{self};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 
 use crate::MIPSFamily;
 use crate::Options;
 
-const EF_MIPS_MACH_5900: u32 =  0x00920000;
+const EF_MIPS_MACH_5900: u32 = 0x00920000;
 
+/// Determines the MIPS family from a given ELF file. This is focused on the
+/// PS1, PS2, PSP, and N64 architectures, specifically.
 pub fn mips_family(elf_path: &Path) -> Option<MIPSFamily> {
     let file_data = std::fs::read(elf_path).expect("Could not read file.");
     let slice = file_data.as_slice();
@@ -22,22 +25,26 @@ pub fn mips_family(elf_path: &Path) -> Option<MIPSFamily> {
     let flags = header.e_flags;
 
     if header.e_machine == elf::abi::EM_MIPS {
-        match flags & elf::abi::EF_MIPS_ARCH {
-        elf::abi::EF_MIPS_ARCH_1 => return Some(MIPSFamily::R3000GTE),
-        elf::abi::EF_MIPS_ARCH_2 => return Some(MIPSFamily::R4000Allegrex),
-        elf::abi::EF_MIPS_ARCH_3 => return Some(MIPSFamily::R4000),
-        _ => (),
-        }
-
         if (flags & elf::abi::EF_MIPS_MACH) == EF_MIPS_MACH_5900 {
             return Some(MIPSFamily::R5900);
+        }
+
+        match flags & elf::abi::EF_MIPS_ARCH {
+            elf::abi::EF_MIPS_ARCH_1 => return Some(MIPSFamily::R3000GTE),
+            elf::abi::EF_MIPS_ARCH_2 => return Some(MIPSFamily::R4000Allegrex),
+            elf::abi::EF_MIPS_ARCH_3 => return Some(MIPSFamily::R4000),
+            _ => (),
         }
     }
 
     return None;
 }
 
-pub fn bin_data(elf_path: &Path) -> Vec<u8> {
+pub fn align(offset: usize, alignment: usize) -> usize {
+    (offset + alignment - 1) & !(alignment - 1)
+}
+
+pub fn bin_data(elf_path: &Path) -> HashMap<usize, Vec<u8>> {
     let file_data = std::fs::read(elf_path).expect("Could not read file.");
     let slice = file_data.as_slice();
     let file = ElfBytes::<AnyEndian>::minimal_parse(slice).expect("Parse elf file");
@@ -51,7 +58,7 @@ pub fn bin_data(elf_path: &Path) -> Vec<u8> {
     );
 
     // Parse the shdrs and collect them into a map keyed on their zero-copied name
-    let program_section_header: SectionHeader = shdrs
+    let program_section_headers: Vec<SectionHeader> = shdrs
         .iter()
         .filter(|shdr| shdr.sh_type == elf::abi::SHT_PROGBITS)
         .filter(|shdr| (shdr.sh_flags as u32 & elf::abi::SHF_EXECINSTR) == elf::abi::SHF_EXECINSTR)
@@ -63,15 +70,23 @@ pub fn bin_data(elf_path: &Path) -> Vec<u8> {
             let section_name = strtab.get(shdr.sh_name as usize).unwrap();
             section_name != ".mwo_header" && section_name != ".header"
         })
-        .next()
-        .expect("Expected one PROGBITS section");
+        // .inspect(|shdr| println!("found section {:?}", shdr))
+        .collect();
 
-    // we have the right data
-    let (data, _) = file
-        .section_data(&program_section_header)
-        .expect("section data");
+    // TODO: determine capacity first
 
-    data.to_vec()
+    let mut data = HashMap::new();
+    for program_section_header in program_section_headers {
+        let (section_data, _) = file
+            .section_data(&program_section_header)
+            .expect("section data");
+        data.insert(
+            program_section_header.sh_addr as usize,
+            section_data.to_vec(),
+        );
+    }
+
+    data
 }
 
 pub struct Symbol {
@@ -94,7 +109,6 @@ pub fn function_symbols(elf_path: &Path) -> Vec<FunctionEntry> {
 
     symtab
         .iter()
-        /* .filter(|s| s.st_shndx != SHNDX_EXTERNAL) */
         .filter(|s| s.st_symtype() == elf::abi::STT_FUNC)
         .map(|s| FunctionEntry {
             name: strtab.get(s.st_name as usize).unwrap().to_string(),

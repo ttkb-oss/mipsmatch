@@ -1,9 +1,14 @@
+default: all
+
+.PHONY: all
 all:
 	# nothing
 
+.PHONY: spellcheck
 spellcheck: dict
 	cargo spellcheck --fix
 
+.PHONY: dict
 dict: target/tmp/dict.dic
 
 target/tmp/dict.txt: .config/dict.txt
