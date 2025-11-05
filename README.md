@@ -110,6 +110,38 @@ find all function symbols. The elf file also contains the binary image which is 
 Fingerprints are created using Horner's Method. A radix and modulus have been chosen to optimize entropy for a 32-bit
 fingerprint. Rabin-Karp is used to find these fingerprints in other files.
 
+## Fingerprint Versions (future work)
+
+Fingerprints are URNs which contain a version marker followed by version specific fields.
+
+    urn:decomp:match:fingerprint:<version>:<fingerprint>
+
+`<version>` is an opaque string specifying the fingerprint version being used. Currently there is only one version,
+which is "m0".
+
+The `<fingerprint>` section should contain all information necessary to match the contents of a symbol.
+
+### Version m0
+
+Version m0 fingerprints are for finding 32-Bit MIPS functions and are in the format:
+
+    <size>[$<modulus>]$<hash>
+
+`size` is the size in bytes of the contents of the function symbol. Dividing by 4 would give you the total number of
+instructions in the referenced function.
+
+The optional `modulus` is used to eliminate bias and keep the hash within bounds. The chosen value should be a large,
+32-bit, unsigned prime number. If not provided, the default value 4294967279 should be used.
+
+`hash` is a Rabin-Karp hash of the functions's instructions in their canonical 32-bit form (big-endian) with the
+following masks applied:
+
+* R-Type - 0xFFFFFFFF
+* J-Type - 0xFC000000
+* All others - 0xFFFF0000
+
+See [`sig_for_range`](src/fingerprint.rs) for a reference implementation.
+
 ## What About…
 
 ### `coddog`
@@ -123,6 +155,12 @@ fingerprint. Rabin-Karp is used to find these fingerprints in other files.
 `mipsmatch` matches functions with identical operations and _most_ operands. It only masks out operands that could
 contain global references. It uses previously built map and elf files to find equivalent functions and segments in
 binary blobs without other configuration.
+
+### `bgrep`
+
+I originally tried getting this to work by preprocessing extracted mips binaries and generating mask files then using
+[`bgrep`](https://github.com/hohle/bgrep) to search files. This worked, but required generating a file with the binary
+to match and a mask file per function. This became confusing an intractable.
 
 ## Built on the Shoulders of Giants
 
