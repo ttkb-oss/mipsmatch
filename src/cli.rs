@@ -7,7 +7,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 use crate::elf::inspect_elf;
-use crate::fingerprint::fingerprint;
+use crate::fingerprint::{self, fingerprint};
 use crate::scan::scan;
 use crate::Options;
 
@@ -71,8 +71,8 @@ struct GlobalOpts {
     output: Option<PathBuf>,
 
     /// The Rabin-Karp rolling hash modulus
-    #[clap(long, short = 'q', global = true, default_value_t = 0xFFFFFFEF)]
-    modulus: u32,
+    #[clap(long, short = 'q', global = true, default_value_t = fingerprint::MODULUS_V0)]
+    modulus: u64,
 }
 
 pub fn main() {

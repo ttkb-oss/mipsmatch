@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
+use crate::fingerprint::Fingerprint;
 use serde::{Deserialize, Serialize};
 use serde_with::{self, serde_as};
 use std::collections::HashMap;
@@ -74,7 +75,7 @@ pub trait SerializeToYAML {
 pub struct FunctionSignature {
     pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
-    pub fingerprint: u64,
+    pub fingerprint: Fingerprint,
     pub size: usize,
 }
 
@@ -100,7 +101,7 @@ pub struct RODataSignature {
 pub struct SegmentSignature {
     pub name: String,
     // #[serde_as(as = "serde_with::hex::Hex<serde_with::formats::Uppercase>")]
-    pub fingerprint: u64,
+    pub fingerprint: Fingerprint,
     pub size: usize,
     pub family: MIPSFamily,
     pub rodata: Option<RODataSignature>,
@@ -117,8 +118,13 @@ impl SerializeToYAML for SegmentSignature {
             serde_yaml::to_string(&self.name).unwrap().trim()
         )
         .expect("segment name serialization");
-        writeln!(writer, "{}fingerprint: 0x{:X}", indent, self.fingerprint)
-            .expect("segment fingerprint serialization");
+        writeln!(
+            writer,
+            "{}fingerprint: {}",
+            indent,
+            serde_yaml::to_string(&self.fingerprint).unwrap().trim()
+        )
+        .expect("segment fingerprint serialization");
         writeln!(writer, "{}size: 0x{:X}", indent, self.size).expect("segment size serialization");
         writeln!(
             writer,
@@ -151,8 +157,9 @@ impl SerializeToYAML for SegmentSignature {
             .expect("function name serialization");
             writeln!(
                 writer,
-                "{}  fingerprint: 0x{:X}",
-                indent, function.fingerprint
+                "{}  fingerprint: {}",
+                indent,
+                serde_yaml::to_string(&self.fingerprint).unwrap().trim()
             )
             .expect("function fingerprint serialization");
             writeln!(writer, "{}  size: 0x{:X}", indent, function.size)

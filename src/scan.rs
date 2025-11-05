@@ -7,6 +7,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 use crate::arch::mips;
+use crate::fingerprint::Fingerprint;
 use crate::SerializeToYAML;
 use crate::{
     MIPSFamily, Options, RODataOffset, RODataSignature, RODataSignatureType, SegmentOffset,
@@ -14,7 +15,7 @@ use crate::{
 };
 
 fn find<W: Write>(
-    fingerprint: u64,
+    fingerprint: Fingerprint,
     size: usize,
     instructions: &[u32],
     start: usize,
@@ -42,15 +43,22 @@ fn find<W: Write>(
         return None;
     }
 
-    while hash != fingerprint && i < end {
-        hash = (hash + options.modulus - (rm * instructions[i - count] as u64) % options.modulus)
-            % options.modulus;
-        hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
-        i += 1;
-    }
+    if let Fingerprint::V0(fp) = fingerprint {
+        let fp_hash = fp.hash();
 
-    if hash == fingerprint {
-        Some((i - count) * 4)
+        while hash != fp_hash && i < end {
+            hash = (hash + options.modulus
+                - (rm * instructions[i - count] as u64) % options.modulus)
+                % options.modulus;
+            hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
+            i += 1;
+        }
+
+        if hash == fp_hash {
+            Some((i - count) * 4)
+        } else {
+            None
+        }
     } else {
         None
     }
@@ -220,7 +228,7 @@ pub fn scan<W: Write>(
     options: &mut Options<W>,
 ) {
     let mut segment_map: HashMap<SegmentSignature, usize> = HashMap::new();
-    let mut name_map: HashMap<u64, Vec<String>> = HashMap::new();
+    let mut name_map: HashMap<Fingerprint, Vec<String>> = HashMap::new();
     for match_file in match_files {
         let f = std::fs::File::open(match_file).unwrap();
         for document in serde_yaml::Deserializer::from_reader(io::BufReader::new(f)) {
