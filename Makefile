@@ -2,7 +2,10 @@ default: all
 
 .PHONY: all
 all:
-	# nothing
+	cargo build --release
+
+test:
+	RUST_BACKTRACE=1 cargo test
 
 .PHONY: spellcheck
 spellcheck: dict

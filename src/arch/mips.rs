@@ -143,6 +143,9 @@ pub fn normalize_instruction(instruction: u32, family: MIPSFamily) -> u32 {
 
     // mask any fields which may refer to global symbols. this will
     // mask false positives, but keep most immediates and local vars.
+    //
+    // TODO: this is missing:
+    //        r-type: mfc0, mfc1
     match instruction >> 26 {
         // r-type
         0 => instruction,

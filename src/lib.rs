@@ -159,7 +159,7 @@ impl SerializeToYAML for SegmentSignature {
                 writer,
                 "{}  fingerprint: {}",
                 indent,
-                serde_yaml::to_string(&self.fingerprint).unwrap().trim()
+                serde_yaml::to_string(&function.fingerprint).unwrap().trim()
             )
             .expect("function fingerprint serialization");
             writeln!(writer, "{}  size: 0x{:X}", indent, function.size)

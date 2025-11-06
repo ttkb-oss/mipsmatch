@@ -3,6 +3,7 @@
 use serde::de::{Deserializer, Error as DE, Unexpected, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
 
+use std::cmp;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -22,7 +23,14 @@ use crate::elf::{self};
 
 static FINGERPRINT_V0_PREFIX: &str = "urn:decomp:match:fingerprint:0:";
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// A `Fingerprint` is a versioned identifier for some collection of MIPS
+/// machine code. Currently, only V0 is specified, which has the following
+/// format:
+///
+/// ```pre
+///      urn:decomp:match:fingerprint:0:<size>:<hash>
+/// ```
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Fingerprint {
     V0(FingerprintV0),
 }
@@ -56,11 +64,23 @@ impl FromStr for Fingerprint {
     }
 }
 
-impl ToString for Fingerprint {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for Fingerprint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let s = match self {
             Fingerprint::V0(f) => f.to_string(),
-        }
+        };
+
+        f.write_str(&s)
+    }
+}
+
+impl Debug for Fingerprint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let s = match self {
+            Fingerprint::V0(f) => f.to_string(),
+        };
+
+        f.write_str(&s)
     }
 }
 
@@ -95,32 +115,36 @@ impl<'de> Visitor<'de> for FingerprintVisitor {
     where
         E: DE,
     {
-        Err(DE::invalid_value(Unexpected::Str(&v), &self))
+        match Fingerprint::from_str(&v) {
+            Ok(f) => Ok(f),
+            Err(_) => Err(DE::invalid_value(Unexpected::Str(&v), &self)),
+        }
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
     where
         E: DE,
     {
-        //match str::from_utf8(v) {
-        //    Ok(s) => Ok(s.to_owned()),
-        /* Err(_) => */
-        Err(DE::invalid_value(Unexpected::Bytes(v), &self)) //,
-                                                            //}
+        match str::from_utf8(v) {
+            Ok(s) => match Fingerprint::from_str(s) {
+                Ok(f) => Ok(f),
+                Err(_) => Err(DE::invalid_value(Unexpected::Str(s), &self)),
+            },
+            Err(_) => Err(DE::invalid_value(Unexpected::Bytes(v), &self)),
+        }
     }
 
     fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
     where
         E: DE,
     {
-        //match String::from_utf8(v) {
-        //    Ok(s) => Ok(s),
-        //      Err(e) => Err(DE::invalid_value(
-        //         Unexpected::Bytes(&e.into_bytes()),
-        //         &self,
-        //     )),
-        // }
-        Err(DE::invalid_value(Unexpected::Bytes(&v), &self))
+        match String::from_utf8(v) {
+            Ok(s) => match Fingerprint::from_str(&s) {
+                Ok(f) => Ok(f),
+                Err(_) => Err(DE::invalid_value(Unexpected::Str(&s), &self)),
+            },
+            Err(e) => Err(DE::invalid_value(Unexpected::Bytes(&e.into_bytes()), &self)),
+        }
     }
 }
 
@@ -277,11 +301,11 @@ impl ToString for FingerprintV0 {
         match self.modulus {
             Some(m) => {
                 format!(
-                    "{}{}:{:X}:{}",
+                    "{}{}:{:x}:{}",
                     FINGERPRINT_V0_PREFIX, self.size, self.hash, m
                 )
             }
-            None => format!("{}{}:{:X}", FINGERPRINT_V0_PREFIX, self.size, self.hash),
+            None => format!("{}{}:{:x}", FINGERPRINT_V0_PREFIX, self.size, self.hash),
         }
     }
 }
@@ -296,20 +320,27 @@ fn sig_for_range<W: Write>(
         ((radix * acc) + (s as u64)) % q
     }
 
-    let mut acc: u64 = 0;
-
-    for i in (offset..(offset + size)).step_by(4) {
-        // println!("i: {} size: {} offset: {} bytes: {}", i, size, offset, bytes.len());
-        // get instruction
-        // println!("bytes: {} to {} of {}", i, i + 4, bytes.len());
-        let masked_ins =
-            mips::bytes_to_normalized_instruction(&bytes[i..(i + 4)], options.mips_family);
-
-        acc = horner_hash(masked_ins, acc, options.radix, options.modulus);
+    // find last jr instruction
+    let mut unpadded_size = size;
+    while unpadded_size > 0 {
+        unpadded_size -= 4;
+        let i = unpadded_size;
+        if mips::bytes_to_normalized_instruction(&bytes[i..(i + 4)], options.mips_family) != 0 {
+            unpadded_size += 4;
+            break;
+        }
     }
+    unpadded_size = cmp::min(size, unpadded_size + 4);
+
+    let acc: u64 = bytes[offset..(offset + unpadded_size)]
+        .chunks(4)
+        .map(|ins| mips::bytes_to_normalized_instruction(&ins, options.mips_family))
+        .fold(0, |acc, masked_ins| {
+            horner_hash(masked_ins, acc, options.radix, options.modulus)
+        });
 
     Fingerprint::V0(FingerprintV0::new_with_modulus(
-        size as u64,
+        unpadded_size as u64,
         acc,
         options.modulus,
     ))
@@ -343,8 +374,6 @@ fn calculate_rodata_signature<W: Write>(
 
     let offset = rodata_info.vrom;
     let last_offset = offset + size - 4;
-
-    // println!("rodata for segment: {:?}", map);
 
     for i in (offset..(offset + size)).step_by(4) {
         let addr = mips::read_word(&bytes[i..(i + 4)], options.mips_family);
@@ -399,8 +428,6 @@ fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mu
     for symbol in map.text_symbols.iter() {
         let segment_hash = sig_for_range(bytes, symbol.offset - map.vrom, symbol.size, options);
 
-        // println!("getting sig for {} at 0x{:x}: {:x}", symbol.name, symbol.offset, symbol.size);
-
         functions.push(FunctionSignature {
             name: symbol.name.clone(),
             fingerprint: segment_hash,
@@ -438,9 +465,7 @@ fn data_for_segment<'a>(
 
 pub fn fingerprint<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Options<W>) {
     let elf_symbols = elf::function_symbols(elf_file);
-    // println!("symbols: {:?}", elf_symbols);
     let segments = read_segments(map_file, ".text", elf_symbols);
-    // println!("segments: {:?}", segments);
     let bin_data = elf::bin_data(elf_file);
 
     if let Some(family) = elf::mips_family(elf_file) {
@@ -448,9 +473,84 @@ pub fn fingerprint<W: Write>(map_file: &Path, elf_file: &Path, options: &mut Opt
     }
 
     for map in segments {
-        // println!("segment: {:?}", map);
         if let Some(data) = data_for_segment(&bin_data, &map) {
             calculate_object_hashes(&map, data, options);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_fingerprint_v0() {
+        let f0 = FingerprintV0::new(1, 2);
+        assert_eq!(f0.to_string(), "urn:decomp:match:fingerprint:0:1:2");
+        assert_eq!(
+            FingerprintV0::new_with_modulus(1, 10, 3).to_string(),
+            "urn:decomp:match:fingerprint:0:1:a:3"
+        );
+
+        if let Ok(Fingerprint::V0(f)) =
+            Fingerprint::from_str("urn:decomp:match:fingerprint:0:1:A:3")
+        {
+            assert_eq!(f, FingerprintV0::new_with_modulus(1, 10, 3))
+        } else {
+            panic!("Expected Fingerprint::V0")
+        }
+
+        let f1 = Fingerprint::from_str("urn:decomp:match:fingerprint:0:1:2").unwrap();
+        assert_eq!(f1.ver(), "0");
+        assert_eq!(f1.to_string(), FingerprintV0::new(1, 2).to_string());
+
+        if let Ok(Fingerprint::V0(f2)) = Fingerprint::from_str("urn:decomp:match:fingerprint:0:1:2")
+        {
+            assert_eq!(f2.size(), 1);
+            assert_eq!(f2.hash(), 2);
+            assert_eq!(f2.modulus(), None);
+        } else {
+            panic!("Expected Fingerprint::V0")
+        }
+    }
+
+    #[test]
+    fn test_sig_for_range() {
+        let buff = Cursor::new(Vec::new());
+        let options = Options::new(buff);
+        let nop: [u8; 4] = [0, 0, 0, 0];
+
+        let sig_n = sig_for_range(&nop, 0, 4, &options);
+        let Fingerprint::V0(f) = sig_n;
+        assert_eq!(f.size(), 4);
+        assert_eq!(f.hash(), 0);
+
+        let jr_ra_nops: [u8; 24] = [
+            0x08, 0x00, 0xE0, 0x03, // jr $ra
+            0, 0, 0, 0, // nop
+            0, 0, 0, 0, // nop
+            0, 0, 0, 0, // nop
+            0, 0, 0, 0, // nop
+            0, 0, 0, 0, // nop
+        ];
+
+        // only the `jr` and one `nop`
+        let sig_jr_ra_nop = sig_for_range(&jr_ra_nops, 0, 8, &options);
+        let Fingerprint::V0(f2) = sig_jr_ra_nop;
+        assert_eq!(f2.size(), 8);
+        assert_eq!(f2.hash(), 0x41E00088);
+
+        // only the `jr` and two `nops`
+        let sig_jr_ra_nop_nop = sig_for_range(&jr_ra_nops, 0, 12, &options);
+        let Fingerprint::V0(f2) = sig_jr_ra_nop_nop;
+        assert_eq!(f2.size(), 8);
+        assert_eq!(f2.hash(), 0x41E00088);
+
+        // only the `jr` and all `nops`
+        let sig_jr_ra_nops = sig_for_range(&jr_ra_nops, 0, 24, &options);
+        let Fingerprint::V0(f2) = sig_jr_ra_nops;
+        assert_eq!(f2.size(), 8);
+        assert_eq!(f2.hash(), 0x41E00088);
     }
 }

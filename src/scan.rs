@@ -28,7 +28,7 @@ fn find<W: Write>(
     let mut hash: u64 = 0;
     let mut rm: u64 = 1;
 
-    for _ in 0..(size - 1) {
+    for _ in 1..size {
         rm = (options.radix * rm) % options.modulus;
     }
 
@@ -43,22 +43,18 @@ fn find<W: Write>(
         return None;
     }
 
-    if let Fingerprint::V0(fp) = fingerprint {
-        let fp_hash = fp.hash();
+    let Fingerprint::V0(fp) = fingerprint;
+    let fp_hash = fp.hash();
 
-        while hash != fp_hash && i < end {
-            hash = (hash + options.modulus
-                - (rm * instructions[i - count] as u64) % options.modulus)
-                % options.modulus;
-            hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
-            i += 1;
-        }
+    while hash != fp_hash && i < end {
+        hash = (hash + options.modulus - (rm * instructions[i - count] as u64) % options.modulus)
+            % options.modulus;
+        hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
+        i += 1;
+    }
 
-        if hash == fp_hash {
-            Some((i - count) * 4)
-        } else {
-            None
-        }
+    if hash == fp_hash {
+        Some((i - count) * 4)
     } else {
         None
     }

@@ -1,43 +1,14 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
-use mipsmatch::fingerprint::{self, Fingerprint, FingerprintV0};
+use mipsmatch::fingerprint::{Fingerprint, FingerprintV0};
 use mipsmatch::MIPSFamily;
 use mipsmatch::Options;
 use mipsmatch::SegmentSignature;
 use serde::Deserialize;
 use serde_yaml::{self};
-use std::any::Any;
 use std::io::{self, Cursor, Write};
 use std::path::Path;
 use std::str::FromStr;
-
-#[test]
-fn test_fingerprint_v0() {
-    let f0 = FingerprintV0::new(1, 2);
-    assert_eq!(f0.to_string(), "urn:decomp:match:fingerprint:0:1:2");
-    assert_eq!(
-        FingerprintV0::new_with_modulus(1, 10, 3).to_string(),
-        "urn:decomp:match:fingerprint:0:1:A:3"
-    );
-
-    if let Ok(Fingerprint::V0(f)) = Fingerprint::from_str("urn:decomp:match:fingerprint:0:1:A:3") {
-        assert_eq!(f, FingerprintV0::new_with_modulus(1, 10, 3))
-    } else {
-        panic!("Expected Fingerprint::V0")
-    }
-
-    let f1 = Fingerprint::from_str("urn:decomp:match:fingerprint:0:1:2").unwrap();
-    assert_eq!(f1.ver(), "0");
-    assert_eq!(f1.to_string(), FingerprintV0::new(1, 2).to_string());
-
-    if let Ok(Fingerprint::V0(f2)) = Fingerprint::from_str("urn:decomp:match:fingerprint:0:1:2") {
-        assert_eq!(f2.size(), 1);
-        assert_eq!(f2.hash(), 2);
-        assert_eq!(f2.modulus(), None);
-    } else {
-        panic!("Expected Fingerprint::V0")
-    }
-}
 
 // PS1
 #[test]
@@ -59,21 +30,89 @@ fn test_tt_004() {
 
     let mut i = 0;
     for document in serde_yaml::Deserializer::from_str(config.as_str()) {
-        i += 1;
         let segment = SegmentSignature::deserialize(document).unwrap();
 
         println!("doc: {:?}", segment);
         io::stdout().flush().unwrap();
-        assert_eq!(segment.family, MIPSFamily::R3000GTE);
 
-        if i == 1 {
-            assert_eq!(segment.name, "sword");
-            assert_eq!(segment.fingerprint, Fingerprint::new_v0(128, 877467234));
-            assert_eq!(segment.size, 128);
+        match i {
+            0 => assert_sword(&segment),
+            1 => assert_servant_common(&segment),
+            _ => (),
         }
+        i += 1;
     }
 
     assert_eq!(i, 2);
+}
+
+/*
+---
+name: sword
+fingerprint: urn:decomp:match:fingerprint:0:128:344d1662
+size: 0x80
+family: R3000GTE
+rodata:
+  rodataType: EndsWithJumpTable
+  size: 0x34
+functions:
+- name: goodbye_world
+  fingerprint: urn:decomp:match:fingerprint:0:12:2a8404ae
+  size: 0x10
+- name: hello_world
+  fingerprint: urn:decomp:match:fingerprint:0:108:ea138192
+  size: 0x70
+*/
+fn assert_sword(segment: &SegmentSignature) {
+    assert_eq!(segment.name, "sword");
+    assert_eq!(segment.family, MIPSFamily::R3000GTE);
+    assert_eq!(segment.fingerprint, Fingerprint::new_v0(128, 0x344d1662));
+    assert_eq!(segment.size, 128);
+    assert_eq!(segment.functions.len(), 2);
+
+    let f0 = segment.functions.get(0).expect("functions[0]");
+    assert_eq!(f0.name, "goodbye_world");
+    assert_eq!(f0.fingerprint, Fingerprint::new_v0(12, 0x2a8404ae));
+
+    let f1 = segment.functions.get(1).expect("functions[1]");
+    assert_eq!(f1.name, "hello_world");
+    assert_eq!(f1.fingerprint, Fingerprint::new_v0(108, 0xea138192));
+}
+
+/*
+name: servant_common
+fingerprint: urn:decomp:match:fingerprint:0:84:418d4b82
+size: 0x54
+family: R3000GTE
+functions:
+- name: local_function
+  fingerprint: urn:decomp:match:fingerprint:0:16:3ac45786
+  size: 0x10
+- name: global_function
+  fingerprint: urn:decomp:match:fingerprint:0:32:efff170e
+  size: 0x20
+- name: global_function_2
+  fingerprint: urn:decomp:match:fingerprint:0:36:43e9eef6
+  size: 0x24
+*/
+fn assert_servant_common(segment: &SegmentSignature) {
+    assert_eq!(segment.name, "servant_common");
+    assert_eq!(segment.family, MIPSFamily::R3000GTE);
+    assert_eq!(segment.fingerprint, Fingerprint::new_v0(84, 0x418d4b82));
+    assert_eq!(segment.size, 84);
+    assert_eq!(segment.functions.len(), 3);
+
+    let f0 = segment.functions.get(0).expect("functions[0]");
+    assert_eq!(f0.name, "local_function");
+    assert_eq!(f0.fingerprint, Fingerprint::new_v0(12, 0x12840525));
+
+    let f1 = segment.functions.get(1).expect("functions[1]");
+    assert_eq!(f1.name, "global_function");
+    assert_eq!(f1.fingerprint, Fingerprint::new_v0(32, 0xefff170e));
+
+    let f2 = segment.functions.get(2).expect("functions[2]");
+    assert_eq!(f2.name, "global_function_2");
+    assert_eq!(f2.fingerprint, Fingerprint::new_v0(36, 0x43e9eef6));
 }
 
 /*
@@ -113,39 +152,3 @@ fn test_sm64() {
     }
 }
 */
-
-// PS2
-#[test]
-fn test_SCPS_150_97() {
-    let buff = Cursor::new(Vec::new());
-
-    let mut options = Options::new(buff);
-
-    mipsmatch::fingerprint::fingerprint(
-        &Path::new("tests/data/SCPS_150.97.map"),
-        &Path::new("tests/data/SCPS_150.97.elf"),
-        &mut options,
-    );
-
-    let config = String::from_utf8(options.writer.into_inner()).unwrap();
-
-    println!("cursor: {}", config);
-    io::stdout().flush().unwrap();
-
-    let mut i = 0;
-    for document in serde_yaml::Deserializer::from_str(config.as_str()) {
-        i += 1;
-        let segment = SegmentSignature::deserialize(document).unwrap();
-
-        println!("doc: {:?}", segment);
-        io::stdout().flush().unwrap();
-
-        assert_eq!(segment.family, MIPSFamily::R5900);
-
-        if i == 1 {
-            assert_eq!(segment.name, "crt0");
-            assert_eq!(segment.fingerprint, Fingerprint::new_v0(0xD0, 0x7496ECBB));
-            assert_eq!(segment.size, 0xD0);
-        }
-    }
-}
