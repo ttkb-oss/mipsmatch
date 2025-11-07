@@ -6,10 +6,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::cmp;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::fmt::Formatter;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
@@ -363,6 +360,9 @@ fn calculate_rodata_signature<W: Write>(
         return None;
     };
 
+    return None;
+/*
+
     // assumption: jump tables will be addresses inside of a text symbol, but cannot
     // be the same value of any text symbol.
 
@@ -418,6 +418,7 @@ fn calculate_rodata_signature<W: Write>(
         rodataType: RODataSignatureType::Unknown,
         size: size,
     })
+*/
 }
 
 fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mut Options<W>) {

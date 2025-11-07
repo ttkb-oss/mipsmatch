@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
+use crate::arch::inspect_bin;
 use crate::elf::inspect_elf;
 use crate::fingerprint::{self, fingerprint};
 use crate::scan::scan;
@@ -50,6 +51,9 @@ enum CLICommand {
 
     /// Test target for ELF files
     Elf { elf: PathBuf },
+
+    /// Inspect bin files
+    Bin { bin: PathBuf },
 }
 
 #[derive(ValueEnum, Clone, Default, Debug)]
@@ -99,6 +103,9 @@ pub fn main() {
         }
         CLICommand::Elf { elf } => {
             inspect_elf(&elf, &mut options);
+        }
+        CLICommand::Bin { bin } => {
+            inspect_bin(&bin, &mut options);
         }
     }
 }
