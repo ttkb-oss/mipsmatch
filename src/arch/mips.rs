@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2025 TTKB, LLC
 // SPDX-License-Identifier: BSD-3-CLAUSE
 
+use std::fmt::{self, Debug, Formatter};
+
 use rabbitizer::InstrCategory;
 use rabbitizer::Instruction;
 use rabbitizer::OperandType;
@@ -23,6 +25,15 @@ impl MIPSCategory for MIPSFamily {
 }
 
 pub fn le_bytes_to_u32(bytes: &[u8]) -> u32 {
+    // n.b.! u32 provides from_le_bytes([u8; 4]) which requires
+    //       a 4-byte copy, since we only have a slice. that
+    //       copy and related moves is 3.7x slower than the
+    //       the typical C conversion using shifts.
+    //
+    //       for posterity, the idiomatic way of doing this
+    //       would be:
+    //
+    //           u32::from_le_bytes(bytes[0..4].try_into().unwrap())
     ((bytes[3] as u32) << 24)
         | ((bytes[2] as u32) << 16)
         | ((bytes[1] as u32) << 8)
@@ -34,6 +45,20 @@ pub fn be_bytes_to_u32(bytes: &[u8]) -> u32 {
         | ((bytes[1] as u32) << 16)
         | ((bytes[2] as u32) << 8)
         | (bytes[3] as u32)
+}
+
+pub fn bs_bytes_to_u32(bytes: &[u8]) -> u32 {
+    ((bytes[1] as u32) << 24)
+        | ((bytes[0] as u32) << 16)
+        | ((bytes[3] as u32) << 8)
+        | (bytes[2] as u32)
+}
+
+pub fn ls_bytes_to_u32(bytes: &[u8]) -> u32 {
+    ((bytes[2] as u32) << 24)
+        | ((bytes[3] as u32) << 16)
+        | ((bytes[0] as u32) << 8)
+        | (bytes[1] as u32)
 }
 
 pub fn bytes_to_le_instruction(bytes: &[u8]) -> u32 {
@@ -156,6 +181,66 @@ pub fn normalize_instruction(instruction: u32, family: MIPSFamily) -> u32 {
     }
 }
 
+#[derive(Eq, Hash, Debug, PartialEq)]
+pub enum BinFormat {
+    BigEndian,
+    LittleEndian,
+    BigSwapped,
+    LittleSwapped,
+}
+
+impl BinFormat {
+    pub fn to_canonical(&self) -> impl Fn(&[u8]) -> u32 {
+        match self {
+            Self::BigEndian => be_bytes_to_u32,
+            Self::LittleEndian => le_bytes_to_u32,
+            Self::BigSwapped => bs_bytes_to_u32,
+            Self::LittleSwapped => ls_bytes_to_u32,
+        }
+    }
+}
+
+/// attempt to determine the image format of a provided
+/// binary. Most MIPS binaries are natively big-endian
+/// however, Playstation binaries are little-endian.
+/// To complicate things more, N64 dumps are often in
+/// native big-endian format (`.z64`), sometimes in
+/// little endian format (`.n64`), and sometimes in a
+/// BS -- err, I mean -- byte-swapped format.
+pub fn determine_bin_fmt(bytes: &[u8]) -> Option<BinFormat> {
+    const BE_JR_RA: u32 = 0x0800E003;
+    const LE_JR_RA: u32 = 0x03e00008;
+    const BS_JR_RA: u32 = 0x000803E0;
+    const LS_JR_RA: u32 = 0xE0030800;
+
+    let mut be_count: usize = 0;
+    let mut le_count: usize = 0;
+    let mut bs_count: usize = 0;
+    let mut ls_count: usize = 0;
+
+    for i in bytes.chunks(4).map(|b| be_bytes_to_u32(b)) {
+        match i {
+            BE_JR_RA => be_count += 1,
+            LE_JR_RA => le_count += 1,
+            BS_JR_RA => bs_count += 1,
+            LS_JR_RA => ls_count += 1,
+            _ => (),
+        }
+    }
+
+    if be_count > 0 && be_count > le_count && be_count > bs_count && be_count > ls_count {
+        Some(BinFormat::BigEndian)
+    } else if le_count > 0 && le_count > bs_count && le_count > ls_count {
+        Some(BinFormat::LittleEndian)
+    } else if bs_count > 0 && bs_count > ls_count {
+        Some(BinFormat::BigSwapped)
+    } else if ls_count > 0 {
+        Some(BinFormat::LittleSwapped)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,6 +249,56 @@ mod tests {
     fn bytes_to_instruction() {
         let result = bytes_to_le_instruction(&[3, 2, 1, 0]);
         assert_eq!(result, 0x00010203);
+    }
+
+    const BE_JR_RA_BYTES: [u8; 8] = [0x08, 0x00, 0xe0, 0x03, 0, 0, 0, 0];
+    const LE_JR_RA_BYTES: [u8; 8] = [0x03, 0xe0, 0x00, 0x08, 0, 0, 0, 0];
+    const BS_JR_RA_BYTES: [u8; 8] = [0x00, 0x08, 0x03, 0xe0, 0, 0, 0, 0];
+    const LS_JR_RA_BYTES: [u8; 8] = [0xE0, 0x03, 0x08, 0x00, 0, 0, 0, 0];
+
+    #[test]
+    fn bytes_conversion() {
+        assert_eq!(be_bytes_to_u32(&BE_JR_RA_BYTES), 0x0800E003);
+        assert_eq!(le_bytes_to_u32(&LE_JR_RA_BYTES), 0x0800E003);
+        assert_eq!(bs_bytes_to_u32(&BS_JR_RA_BYTES), 0x0800E003);
+
+        assert_eq!(
+            BinFormat::BigEndian.to_canonical()(&BE_JR_RA_BYTES),
+            0x0800E003
+        );
+        assert_eq!(
+            BinFormat::LittleEndian.to_canonical()(&LE_JR_RA_BYTES),
+            0x0800E003
+        );
+        assert_eq!(
+            BinFormat::BigSwapped.to_canonical()(&BS_JR_RA_BYTES),
+            0x0800E003
+        );
+        assert_eq!(
+            BinFormat::LittleSwapped.to_canonical()(&LS_JR_RA_BYTES),
+            0x0800E003
+        );
+    }
+
+    #[test]
+    fn test_determine_bin_fmt() {
+        assert_eq!(
+            determine_bin_fmt(&BE_JR_RA_BYTES),
+            Some(BinFormat::BigEndian)
+        );
+        assert_eq!(
+            determine_bin_fmt(&LE_JR_RA_BYTES),
+            Some(BinFormat::LittleEndian)
+        );
+        assert_eq!(
+            determine_bin_fmt(&BS_JR_RA_BYTES),
+            Some(BinFormat::BigSwapped)
+        );
+        assert_eq!(
+            determine_bin_fmt(&LS_JR_RA_BYTES),
+            Some(BinFormat::LittleSwapped)
+        );
+        assert_eq!(determine_bin_fmt(&[1, 2, 3, 4]), None);
     }
 
     #[test]

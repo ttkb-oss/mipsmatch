@@ -6,10 +6,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::cmp;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::fmt::Formatter;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
@@ -363,61 +360,65 @@ fn calculate_rodata_signature<W: Write>(
         return None;
     };
 
-    // assumption: jump tables will be addresses inside of a text symbol, but cannot
-    // be the same value of any text symbol.
+    return None;
+    /*
 
-    let mut starts_with_jump_table = false;
-    let mut found_non_jump_table_entry = false;
-    let mut last_entry_was_jump_table = false;
+        // assumption: jump tables will be addresses inside of a text symbol, but cannot
+        // be the same value of any text symbol.
 
-    let size = rodata_info.size;
+        let mut starts_with_jump_table = false;
+        let mut found_non_jump_table_entry = false;
+        let mut last_entry_was_jump_table = false;
 
-    let offset = rodata_info.vrom;
-    let last_offset = offset + size - 4;
+        let size = rodata_info.size;
 
-    for i in (offset..(offset + size)).step_by(4) {
-        let addr = mips::read_word(&bytes[i..(i + 4)], options.mips_family);
+        let offset = rodata_info.vrom;
+        let last_offset = offset + size - 4;
 
-        if map.is_address_inside_function(addr as usize) {
-            last_entry_was_jump_table = true;
-            if offset == 0 {
-                starts_with_jump_table = true
+        for i in (offset..(offset + size)).step_by(4) {
+            let addr = mips::read_word(&bytes[i..(i + 4)], options.mips_family);
+
+            if map.is_address_inside_function(addr as usize) {
+                last_entry_was_jump_table = true;
+                if offset == 0 {
+                    starts_with_jump_table = true
+                }
+            } else {
+                last_entry_was_jump_table = false;
+                found_non_jump_table_entry = true;
             }
-        } else {
-            last_entry_was_jump_table = false;
-            found_non_jump_table_entry = true;
         }
-    }
 
-    if !found_non_jump_table_entry {
-        return Some(RODataSignature {
-            rodataType: RODataSignatureType::OnlyJumpTables,
-            size: size,
-        });
-    }
-    if starts_with_jump_table && last_entry_was_jump_table {
-        return Some(RODataSignature {
-            rodataType: RODataSignatureType::StartsAndEndsWithJumpTable,
-            size: size,
-        });
-    }
-    if starts_with_jump_table {
-        return Some(RODataSignature {
-            rodataType: RODataSignatureType::StartsWithJumpTable,
-            size: size,
-        });
-    }
-    if last_entry_was_jump_table {
-        return Some(RODataSignature {
-            rodataType: RODataSignatureType::EndsWithJumpTable,
-            size: size,
-        });
-    }
+        if !found_non_jump_table_entry {
+            return Some(RODataSignature {
+                rodataType: RODataSignatureType::OnlyJumpTables,
+                size: size,
+            });
+        }
+        if starts_with_jump_table && last_entry_was_jump_table {
+            return Some(RODataSignature {
+                rodataType: RODataSignatureType::StartsAndEndsWithJumpTable,
+                size: size,
+            });
+        }
+        if starts_with_jump_table {
+            return Some(RODataSignature {
+                rodataType: RODataSignatureType::StartsWithJumpTable,
+                size: size,
+            });
+        }
+        if last_entry_was_jump_table {
+            return Some(RODataSignature {
+                rodataType: RODataSignatureType::EndsWithJumpTable,
+                size: size,
+            });
+        }
 
-    Some(RODataSignature {
-        rodataType: RODataSignatureType::Unknown,
-        size: size,
-    })
+        Some(RODataSignature {
+            rodataType: RODataSignatureType::Unknown,
+            size: size,
+        })
+    */
 }
 
 fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mut Options<W>) {
