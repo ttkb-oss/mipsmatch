@@ -12,6 +12,16 @@ decompiling
 lld
 mapfile_parser
 mipsmatch
+N64
+preprocessing
+PSP
+PSX
+PS1
+PS2
 rabbitizer
 radix
+RODATA
+URN
+URNs
 versioned
+VRAM

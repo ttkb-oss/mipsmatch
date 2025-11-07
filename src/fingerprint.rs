@@ -31,13 +31,13 @@ fn sig_for_range<W: Write>(bytes: &[u8], offset: usize, size: usize, options: &O
     acc
 }
 
-/// classifies the rodata of the object (if present) as being one of the following:
+/// classifies the RODATA of the object (if present) as being one of the following:
 ///
 ///    * only jump tables
 ///    * starts with jump tables
 ///    * ends with jump tables
 ///
-/// this strategy is then used to scan for matching rodata segments in other
+/// this strategy is then used to scan for matching RODATA segments in other
 /// files.
 fn calculate_rodata_signature<W: Write>(
     map: &ObjectMap,

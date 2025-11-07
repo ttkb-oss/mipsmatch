@@ -39,7 +39,7 @@ enum CLICommand {
         granularity: Granularity,
 
         /// The location the inspected binary would be loaded in VRAM. Required for
-        /// searching for DATA and RODATA segements
+        /// searching for DATA and RODATA segments
         #[clap(short, long="vram-start", value_parser=maybe_hex::<usize>)]
         vram_start: Option<usize>,
 
