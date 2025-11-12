@@ -18,11 +18,9 @@ fn find<W: Write>(
     fingerprint: Fingerprint,
     size: usize,
     instructions: &[u32],
-    start: usize,
-    end: usize,
     options: &mut Options<W>,
 ) -> Option<usize> {
-    let mut i = start;
+    let mut i = 0;
     let mut count = 0;
 
     let mut hash: u64 = 0;
@@ -32,7 +30,7 @@ fn find<W: Write>(
         rm = (options.radix * rm) % options.modulus;
     }
 
-    while count < size && i < end {
+    while count < size && i < instructions.len() {
         hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
 
         count += 1;
@@ -46,7 +44,7 @@ fn find<W: Write>(
     let Fingerprint::V0(fp) = fingerprint;
     let fp_hash = fp.hash();
 
-    while hash != fp_hash && i < end {
+    while hash != fp_hash && i < instructions.len() {
         hash = (hash + options.modulus - (rm * instructions[i - count] as u64) % options.modulus)
             % options.modulus;
         hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
@@ -273,8 +271,6 @@ pub fn scan<W: Write>(
             segment.fingerprint,
             segment.size / 4,
             &instructions,
-            0,
-            instructions.len(),
             options,
         );
 
@@ -302,9 +298,7 @@ pub fn scan<W: Write>(
             let function_offset = find(
                 function.fingerprint,
                 function.size / 4,
-                &instructions,
-                position / 4,
-                (offset + segment.size) / 4,
+                &instructions[(position / 4)..((offset + segment.size) / 4)],
                 options,
             );
             if let Some(function_offset) = function_offset {

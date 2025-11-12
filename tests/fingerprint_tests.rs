@@ -72,11 +72,11 @@ fn assert_sword(segment: &SegmentSignature) {
 
     let f0 = segment.functions.get(0).expect("functions[0]");
     assert_eq!(f0.name, "goodbye_world");
-    assert_eq!(f0.fingerprint, Fingerprint::new_v0(12, 0x2a8404ae));
+    assert_eq!(f0.fingerprint, Fingerprint::new_v0(16, 0xd2c44fb0));
 
     let f1 = segment.functions.get(1).expect("functions[1]");
     assert_eq!(f1.name, "hello_world");
-    assert_eq!(f1.fingerprint, Fingerprint::new_v0(108, 0xea138192));
+    assert_eq!(f1.fingerprint, Fingerprint::new_v0(112, 0x8b4b9bb1));
 }
 
 /*
@@ -104,7 +104,7 @@ fn assert_servant_common(segment: &SegmentSignature) {
 
     let f0 = segment.functions.get(0).expect("functions[0]");
     assert_eq!(f0.name, "local_function");
-    assert_eq!(f0.fingerprint, Fingerprint::new_v0(12, 0x12840525));
+    assert_eq!(f0.fingerprint, Fingerprint::new_v0(16, 0x3ac45786));
 
     let f1 = segment.functions.get(1).expect("functions[1]");
     assert_eq!(f1.name, "global_function");

@@ -7,12 +7,14 @@ use std::cmp;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::hash::Hasher;
 use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 
 use crate::arch::mips;
 use crate::map::{read_segments, ObjectMap};
+use crate::rk::RabinKarpMIPSHasher;
 use crate::SerializeToYAML;
 use crate::{FunctionSignature, Options, RODataSignature, RODataSignatureType, SegmentSignature};
 
@@ -307,38 +309,29 @@ impl ToString for FingerprintV0 {
     }
 }
 
-fn sig_for_range<W: Write>(
-    bytes: &[u8],
-    offset: usize,
-    size: usize,
-    options: &Options<W>,
-) -> Fingerprint {
-    fn horner_hash(s: u32, acc: u64, radix: u64, q: u64) -> u64 {
-        ((radix * acc) + (s as u64)) % q
-    }
+fn sig_for_range<W: Write>(bytes: &[u8], options: &Options<W>) -> Fingerprint {
+    // BUG: this strips all but the last nop. even the last nop may not
+    // be necessary if the last instruction does not have a BDS
 
     // find last jr instruction
-    let mut unpadded_size = size;
+    let mut unpadded_size = bytes.len();
     while unpadded_size > 0 {
         unpadded_size -= 4;
         let i = unpadded_size;
-        if mips::bytes_to_normalized_instruction(&bytes[i..(i + 4)], options.mips_family) != 0 {
+        let ins = mips::bytes_to_normalized_instruction(&bytes[i..(i + 4)], options.mips_family);
+        if ins != 0 {
             unpadded_size += 4;
             break;
         }
     }
-    unpadded_size = cmp::min(size, unpadded_size + 4);
+    unpadded_size = cmp::min(bytes.len(), unpadded_size + 4);
 
-    let acc: u64 = bytes[offset..(offset + unpadded_size)]
-        .chunks(4)
-        .map(|ins| mips::bytes_to_normalized_instruction(&ins, options.mips_family))
-        .fold(0, |acc, masked_ins| {
-            horner_hash(masked_ins, acc, options.radix, options.modulus)
-        });
+    let mut hasher = RabinKarpMIPSHasher::new_with_modulus(options.mips_family, options.modulus);
+    hasher.write(&bytes[..unpadded_size]);
 
     Fingerprint::V0(FingerprintV0::new_with_modulus(
         unpadded_size as u64,
-        acc,
+        hasher.finish(),
         options.modulus,
     ))
 }
@@ -422,12 +415,16 @@ fn calculate_rodata_signature<W: Write>(
 }
 
 fn calculate_object_hashes<W: Write>(map: &ObjectMap, bytes: &[u8], options: &mut Options<W>) {
-    let object_hash = sig_for_range(bytes, map.offset - map.vrom, map.size, options);
+    let start = map.offset - map.vrom;
+    let end = start + map.size;
+    let object_hash = sig_for_range(&bytes[start..end], options);
 
     let mut functions = Vec::new();
 
     for symbol in map.text_symbols.iter() {
-        let segment_hash = sig_for_range(bytes, symbol.offset - map.vrom, symbol.size, options);
+        let start = symbol.offset - map.vrom;
+        let end = start + symbol.size;
+        let segment_hash = sig_for_range(&bytes[start..end], options);
 
         functions.push(FunctionSignature {
             name: symbol.name.clone(),
@@ -522,7 +519,7 @@ mod tests {
         let options = Options::new(buff);
         let nop: [u8; 4] = [0, 0, 0, 0];
 
-        let sig_n = sig_for_range(&nop, 0, 4, &options);
+        let sig_n = sig_for_range(&nop[0..4], &options);
         let Fingerprint::V0(f) = sig_n;
         assert_eq!(f.size(), 4);
         assert_eq!(f.hash(), 0);
@@ -537,19 +534,19 @@ mod tests {
         ];
 
         // only the `jr` and one `nop`
-        let sig_jr_ra_nop = sig_for_range(&jr_ra_nops, 0, 8, &options);
+        let sig_jr_ra_nop = sig_for_range(&jr_ra_nops[0..8], &options);
         let Fingerprint::V0(f2) = sig_jr_ra_nop;
         assert_eq!(f2.size(), 8);
         assert_eq!(f2.hash(), 0x41E00088);
 
         // only the `jr` and two `nops`
-        let sig_jr_ra_nop_nop = sig_for_range(&jr_ra_nops, 0, 12, &options);
+        let sig_jr_ra_nop_nop = sig_for_range(&jr_ra_nops[0..12], &options);
         let Fingerprint::V0(f2) = sig_jr_ra_nop_nop;
         assert_eq!(f2.size(), 8);
         assert_eq!(f2.hash(), 0x41E00088);
 
         // only the `jr` and all `nops`
-        let sig_jr_ra_nops = sig_for_range(&jr_ra_nops, 0, 24, &options);
+        let sig_jr_ra_nops = sig_for_range(&jr_ra_nops[0..24], &options);
         let Fingerprint::V0(f2) = sig_jr_ra_nops;
         assert_eq!(f2.size(), 8);
         assert_eq!(f2.hash(), 0x41E00088);

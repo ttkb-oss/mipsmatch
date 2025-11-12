@@ -321,3 +321,45 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod bench {
+    use super::*;
+    use std::time::Instant;
+
+    // Run function and return result with seconds duration
+    pub fn time<F, T>(f: F) -> (T, f64)
+    where
+        F: FnOnce() -> T,
+    {
+        let start = Instant::now();
+        let res = f();
+        let end = start.elapsed();
+
+        let runtime_nanos = end.subsec_nanos();
+        let runtime_secs = runtime_nanos as f64 / 1_000_000_000.0;
+        (res, runtime_secs)
+    }
+
+    const LE_JR_RA_BYTES: [u8; 8] = [0x03, 0xe0, 0x00, 0x08, 0, 0, 0, 0];
+
+    #[test]
+    fn shift_to_32() {
+        let mut t: u128 = 0;
+        let (_, impl_time) = time(|| {
+            for i in 0..10_000_000 {
+                t += le_bytes_to_u32(&LE_JR_RA_BYTES) as u128;
+            }
+        });
+
+        t = 0;
+        let (_, std_time) = time(|| {
+            for i in 0..10_000_000 {
+                t += u32::from_le_bytes(LE_JR_RA_BYTES[0..4].try_into().unwrap()) as u128;
+            }
+        });
+
+        println!("i: {}              s: {}", impl_time, std_time);
+        assert!(impl_time <= std_time);
+    }
+}

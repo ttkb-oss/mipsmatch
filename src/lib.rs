@@ -12,6 +12,7 @@ pub mod cli;
 pub mod elf;
 pub mod fingerprint;
 pub mod map;
+pub mod rk;
 pub mod scan;
 
 /*
