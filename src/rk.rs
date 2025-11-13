@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2025 TTKB, LLC
+// SPDX-License-Identifier: BSD-3-CLAUSE
 use std::hash::Hasher;
 
 use crate::arch::mips;
@@ -48,13 +50,93 @@ impl RabinKarpMIPSHasher {
         }
     }
 
-    pub fn find(&self, hash: u64, bytes: &[u8]) -> usize {
-        0
+    /// Parameters:
+    ///    needle - RK hash like one produced by this hasher
+    ///    size - size of the machine code in bytes that produced the hash
+    ///    bytes - haystack of bytes to search
+    pub fn find(&self, needle: u64, size: usize, bytes: &[u8]) -> Option<usize> {
+        if size > bytes.len() {
+            return None;
+        } else if size == 0 {
+            return Some(0);
+        }
+
+        // starting hash
+        let mut hash = self.hash_be_mips_bytes(0, &bytes[..size]);
+
+        if hash == needle {
+            return Some(0);
+        }
+
+        // removal hash
+        let rm = {
+            let mut rm: u64 = 1;
+            for _ in 1..(size / 4) {
+                rm = (self.radix * rm) % self.modulus;
+            }
+            rm
+        };
+
+        // march through the remainder of the slice along
+        // with the beginning of the slice to pop off the
+        // earliest instructions.
+        //
+        //      new     first
+        //    -------  -------
+        //    [  n  ]  [  0  ]
+        //    [ n+1 ]  [  1  ]
+        //    [ n+2 ]  [  2  ]
+        //       ⋮        ⋮
+        //    [size-1] [size-1-n]
+        //
+        //    0  1  2  … n n+1 n+2 … size-1-n
+        //    ↑          ↑
+        //    ├──────────┤
+        //  first       new
+
+        let instruction_position = bytes[size..]
+            .chunks(4)
+            .map(|ins| mips::bytes_to_normalized_instruction(&ins, self.family))
+            .zip(
+                bytes
+                    .chunks(4)
+                    .map(|ins| mips::bytes_to_normalized_instruction(&ins, self.family)),
+            )
+            .map(|(new, first)| {
+                // remove last instruction
+                hash = (hash + self.modulus - (rm * first as u64) % self.modulus) % self.modulus;
+                hash = self.horner_hash(hash, new);
+                hash
+            })
+            .position(|hash| hash == needle);
+
+        match instruction_position {
+            // a found position must be one after pos because
+            // the 0th position in the remaining slice is 1 after
+            // the position of the `bytes` slice.
+            Some(pos) => Some((pos + 1) * 4),
+            None => None,
+        }
+    }
+
+    fn horner_hash(&self, acc: u64, s: u32) -> u64 {
+        horner_hash(acc, s, self.radix, self.modulus)
+    }
+
+    fn hash_be_mips_bytes(&self, hash: u64, bytes: &[u8]) -> u64 {
+        if (bytes.len() % 4) != 0 {
+            panic!("misaligned block");
+        }
+
+        bytes
+            .chunks(4)
+            .map(|ins| mips::bytes_to_normalized_instruction(&ins, self.family))
+            .fold(hash, |acc, masked_ins| self.horner_hash(acc, masked_ins))
     }
 }
 
 #[inline]
-pub fn horner_hash(s: u32, acc: u64, radix: u64, q: u64) -> u64 {
+pub fn horner_hash(acc: u64, s: u32, radix: u64, q: u64) -> u64 {
     ((radix * acc) + (s as u64)) % q
 }
 
@@ -64,12 +146,7 @@ impl Hasher for RabinKarpMIPSHasher {
             panic!("misaligned block");
         }
 
-        self.hash = bytes
-            .chunks(4)
-            .map(|ins| mips::bytes_to_normalized_instruction(&ins, self.family))
-            .fold(self.hash, |acc, masked_ins| {
-                horner_hash(masked_ins, acc, self.radix, self.modulus)
-            });
+        self.hash = self.hash_be_mips_bytes(self.hash, bytes);
     }
 
     fn finish(&self) -> u64 {
@@ -137,5 +214,52 @@ mod test {
         hasher.write(&JR_RA_NOPS[0..12]);
         assert_eq!(hasher.finish(), 0x3E00008);
         hasher.hash = 0;
+    }
+
+    const RETURN_ZERO_NOPS: [u8; 32] = [
+        0, 0, 0, 0, // nop
+        0, 0, 0, 0, // nop
+        0, 0, 0, 0, // nop
+        0x08, 0x00, 0xE0, 0x03, // jr $ra
+        0x21, 0x10, 0x00, 0x00, // addu $v0, $zero, $zero
+        0, 0, 0, 0, // nop
+        0, 0, 0, 0, // nop
+        0, 0, 0, 0, // nop
+    ];
+
+    use crate::fingerprint::Fingerprint;
+    use crate::scan::{self};
+    use crate::Options;
+    use std::io::Cursor;
+    use std::io::Write;
+
+    #[test]
+    fn test_find() {
+        let mut hasher = RabinKarpMIPSHasher::new(MIPSFamily::R3000GTE);
+
+        assert_eq!(hasher.find(0, 0, &JR_RA_NOPS), Some(0));
+
+        assert_eq!(hasher.find(0x41E00088, 8, &JR_RA_NOPS), Some(0));
+
+        assert_eq!(hasher.find(0x5FE0094C, 12, &JR_RA_NOPS), Some(0));
+
+        hasher.write(&RETURN_ZERO_NOPS[12..16]);
+        let h = hasher.finish();
+        println!("hash: 0x{h:08X}");
+
+        let buff = Cursor::new(Vec::new());
+        let mut options = Options::new(buff);
+        let i = scan::find(
+            Fingerprint::new_v0(4, h),
+            1,
+            &RETURN_ZERO_NOPS
+                .chunks(4)
+                .map(|b| mips::bytes_to_normalized_instruction(b, options.mips_family))
+                .collect::<Vec<u32>>(),
+            &mut options,
+        );
+        assert_eq!(i, Some(12));
+
+        assert_eq!(hasher.find(h, 4, &RETURN_ZERO_NOPS), Some(12));
     }
 }

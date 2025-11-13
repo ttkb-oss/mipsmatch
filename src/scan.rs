@@ -8,55 +8,12 @@ use std::path::PathBuf;
 
 use crate::arch::mips;
 use crate::fingerprint::Fingerprint;
+use crate::rk::RabinKarpMIPSHasher;
 use crate::SerializeToYAML;
 use crate::{
     MIPSFamily, Options, RODataOffset, RODataSignature, RODataSignatureType, SegmentOffset,
     SegmentSignature,
 };
-
-fn find<W: Write>(
-    fingerprint: Fingerprint,
-    size: usize,
-    instructions: &[u32],
-    options: &mut Options<W>,
-) -> Option<usize> {
-    let mut i = 0;
-    let mut count = 0;
-
-    let mut hash: u64 = 0;
-    let mut rm: u64 = 1;
-
-    for _ in 1..size {
-        rm = (options.radix * rm) % options.modulus;
-    }
-
-    while count < size && i < instructions.len() {
-        hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
-
-        count += 1;
-        i += 1;
-    }
-
-    if i >= instructions.len() {
-        return None;
-    }
-
-    let Fingerprint::V0(fp) = fingerprint;
-    let fp_hash = fp.hash();
-
-    while hash != fp_hash && i < instructions.len() {
-        hash = (hash + options.modulus - (rm * instructions[i - count] as u64) % options.modulus)
-            % options.modulus;
-        hash = ((options.radix * hash) + instructions[i] as u64) % options.modulus;
-        i += 1;
-    }
-
-    if hash == fp_hash {
-        Some((i - count) * 4)
-    } else {
-        None
-    }
-}
 
 // determine if the block specified by offset and size overlap with
 // addresses already in allocated_address_space
@@ -260,19 +217,16 @@ pub fn scan<W: Write>(
     let mut allocated_address_space: HashMap<usize, usize> = HashMap::new();
 
     let bytes = std::fs::read(bin_file).expect("Could not read bin file");
-    let instructions: Vec<u32> = bytes
-        .chunks(4)
-        .map(|b| mips::bytes_to_normalized_instruction(b, options.mips_family))
-        .collect();
+
+    let hasher = RabinKarpMIPSHasher::new_with_modulus(options.mips_family, options.modulus);
 
     for segment in sorted_segments {
+        let Fingerprint::V0(fp) = segment.fingerprint;
+        let fp_hash = fp.hash();
+        let fp_size = fp.size() as usize;
+
         // try to find the entire object, first
-        let offset = find(
-            segment.fingerprint,
-            segment.size / 4,
-            &instructions,
-            options,
-        );
+        let offset = hasher.find(fp_hash, fp_size, &bytes);
 
         let Some(offset) = offset else {
             continue;
@@ -295,15 +249,15 @@ pub fn scan<W: Write>(
         let function_len = segment.functions.len();
 
         for function in segment.functions.iter() {
-            let function_offset = find(
-                function.fingerprint,
-                function.size / 4,
-                &instructions[(position / 4)..((offset + segment.size) / 4)],
-                options,
-            );
+            let Fingerprint::V0(fp) = function.fingerprint;
+            let fp_hash = fp.hash();
+            let fp_size = fp.size() as usize;
+
+            let function_offset =
+                hasher.find(fp_hash, fp_size, &bytes[position..(offset + segment.size)]);
             if let Some(function_offset) = function_offset {
+                map.insert(function.name.clone(), position + function_offset);
                 position = function_offset + function.size;
-                map.insert(function.name.clone(), function_offset);
             }
         }
 
